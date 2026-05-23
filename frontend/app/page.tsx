@@ -108,12 +108,12 @@ export default function Home() {
       </header>
 
       {/* Hero */}
-      <section className="container mx-auto px-6 pt-16 pb-10">
-        <div className="text-center max-w-2xl mx-auto mb-8">
-          <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tighter mb-4">
+      <section className="container mx-auto px-6 pt-12 pb-8">
+        <div className="text-center max-w-2xl mx-auto mb-6">
+          <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tighter mb-3">
             What's actually live on your domain.
           </h2>
-          <p className="text-base text-muted-foreground leading-relaxed">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             Resolve DNS records across 15 global resolvers, audit email security posture, inspect TLS certificates, and read WHOIS — without an account.
           </p>
         </div>
@@ -174,15 +174,19 @@ export default function Home() {
       {/* Results */}
       <section className="container mx-auto px-6 py-8">
         {!submitted && (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
             {TABS.map((t) => {
               const Icon = t.icon;
               return (
-                <div key={t.key} className="premium-surface premium-card rounded-xl p-5">
-                  <Icon className="w-5 h-5 text-orange-400 mb-3" />
-                  <p className="font-display font-bold text-sm tracking-tight mb-1">{t.label}</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{t.desc}</p>
-                </div>
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className="premium-surface premium-card rounded-xl p-4 text-left cursor-pointer"
+                >
+                  <Icon className="w-4 h-4 text-orange-400 mb-2" />
+                  <p className="font-display font-bold text-xs tracking-tight mb-0.5">{t.label}</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{t.desc}</p>
+                </button>
               );
             })}
           </div>
@@ -276,21 +280,21 @@ function PropagationView({ data, type, setType }: { data: any; type: string; set
   const types = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"];
   if (!data?.consensus || !data?.resolvers) return null;
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <p className="eyebrow mb-1">Propagation</p>
-          <h3 className="font-display text-xl font-bold tracking-tight">{data.domain}</h3>
-          <p className="text-xs text-muted-foreground mt-1">
+          <h3 className="font-display text-lg font-bold tracking-tight">{data.domain}</h3>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
             {data.consensus.agreeing}/{data.consensus.total} resolvers agree · {data.elapsed_ms}ms
           </p>
         </div>
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-1 flex-wrap">
           {types.map((t) => (
             <button
               key={t}
               onClick={() => setType(t)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider ${type === t ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'bg-white/[0.03] text-muted-foreground border border-white/5 hover:text-foreground'}`}
+              className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider ${type === t ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'bg-white/[0.03] text-muted-foreground border border-white/5 hover:text-foreground'}`}
             >
               {t}
             </button>
@@ -298,27 +302,28 @@ function PropagationView({ data, type, setType }: { data: any; type: string; set
         </div>
       </div>
 
-      <WorldMap resolvers={data.resolvers} />
-
-      <div className="space-y-1.5">
-        {data.resolvers.map((r: any) => (
-          <div key={r.resolver.id} className="premium-surface premium-card rounded-xl p-3 flex items-center gap-3">
-            <span className={`w-2 h-2 rounded-full ${!r.ok ? 'bg-red-400' : r.consensus ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-display font-semibold text-sm tracking-tight">{r.resolver.name}</span>
-                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{r.resolver.city}, {r.resolver.country}</span>
-                <span className="text-[10px] font-mono text-muted-foreground/70">{r.resolver.ip}</span>
+      <div className="grid lg:grid-cols-[1fr_1fr] gap-3">
+        {/* Results left */}
+        <div className="space-y-1 max-h-[420px] overflow-y-auto pr-1">
+          {data.resolvers.map((r: any) => (
+            <div key={r.resolver.id} className="premium-surface premium-card rounded-lg p-2.5 flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${!r.ok ? 'bg-red-400' : r.consensus ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-display font-semibold text-xs tracking-tight">{r.resolver.name}</span>
+                  <span className="text-[9px] uppercase tracking-widest text-muted-foreground">{r.resolver.city}, {r.resolver.country}</span>
+                </div>
+                <div className="font-mono text-[11px] text-foreground/80 truncate">
+                  {r.ok ? (r.records.length > 0 ? r.records.join(", ") : "—") : <span className="text-red-300">{r.error}</span>}
+                </div>
               </div>
-              <div className="font-mono text-xs text-foreground/80 mt-1 truncate">
-                {r.ok ? (r.records.length > 0 ? r.records.join(", ") : "—") : <span className="text-red-300">{r.error}</span>}
-              </div>
+              <span className="text-[10px] text-muted-foreground flex-shrink-0">{r.latency_ms}ms</span>
             </div>
-            <span className="text-xs text-muted-foreground flex-shrink-0 flex items-center gap-1">
-              <Clock className="w-3 h-3" /> {r.latency_ms}ms
-            </span>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {/* Map right */}
+        <WorldMap resolvers={data.resolvers} />
       </div>
     </div>
   );
