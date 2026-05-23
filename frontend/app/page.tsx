@@ -1,0 +1,610 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import {
+  Search, Globe, Mail, ShieldCheck, Server, Map, FileSearch, AlertTriangle,
+  CheckCircle2, XCircle, Loader2, Lock, ChevronRight, Network, Radio, Clock,
+} from "lucide-react";
+import { WorldMap } from "@/components/world-map";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
+
+type TabKey = "lookup" | "propagation" | "email" | "tls" | "whois" | "headers" | "blacklist" | "dnssec";
+
+const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
+  { key: "lookup",      label: "DNS records",   icon: Globe,       desc: "All record types (A, AAAA, MX, NS, TXT, SOA, SRV, CAA)" },
+  { key: "propagation", label: "Propagation",   icon: Map,         desc: "Query 15 global resolvers, see who agrees" },
+  { key: "email",       label: "Email auth",    icon: Mail,        desc: "SPF, DKIM, DMARC, MTA-STS, TLS-RPT, BIMI" },
+  { key: "tls",         label: "TLS / SSL",     icon: Lock,        desc: "Certificate chain, expiry, ALPN, cipher" },
+  { key: "whois",       label: "WHOIS",         icon: FileSearch,  desc: "Registrar, creation, expiry, status" },
+  { key: "headers",     label: "HTTP headers",  icon: ShieldCheck, desc: "Security header grade (HSTS, CSP, etc.)" },
+  { key: "blacklist",   label: "Blacklists",    icon: AlertTriangle, desc: "Check against 10 major DNSBLs" },
+  { key: "dnssec",      label: "DNSSEC",        icon: Network,     desc: "DNSKEY + DS presence" },
+];
+
+export default function Home() {
+  const [tab, setTab] = useState<TabKey>("lookup");
+  const [domain, setDomain] = useState("");
+  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [propType, setPropType] = useState<"A" | "AAAA" | "CNAME" | "MX" | "NS" | "TXT">("A");
+
+  const run = async (which: TabKey, target: string) => {
+    if (!target) return;
+    setLoading(true);
+    setError(null);
+    setData(null);
+    try {
+      const params = new URLSearchParams();
+      params.set(which === "blacklist" ? "ip" : "domain", target);
+      if (which === "propagation") params.set("type", propType);
+      const res = await fetch(`${API}/${which}?${params.toString()}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const body = await res.json();
+      setData(body);
+    } catch (e: any) {
+      setError(e?.message || "Request failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Re-run when tab or propType changes
+  useEffect(() => {
+    if (submitted) run(tab, submitted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, propType]);
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleaned = domain.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
+    if (!cleaned) return;
+    setSubmitted(cleaned);
+    run(tab, cleaned);
+  };
+
+  return (
+    <main className="min-h-screen">
+      {/* Top bar */}
+      <header className="border-b border-white/5 bg-background/70 backdrop-blur-2xl sticky top-0 z-40">
+        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="ndns-mark w-9 h-9 text-[13px]">N</div>
+            <div className="leading-tight">
+              <p className="eyebrow">Free · public</p>
+              <h1 className="text-[15px] font-display font-bold tracking-tight">Nexus DNS</h1>
+            </div>
+          </div>
+          <a
+            href="https://brandprotection.segbytes.co.za"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Brand Protection <ChevronRight className="w-3 h-3" />
+          </a>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <section className="container mx-auto px-6 pt-16 pb-10">
+        <div className="text-center max-w-2xl mx-auto mb-8">
+          <p className="eyebrow mb-3">DNS · email · TLS · WHOIS</p>
+          <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tighter mb-4">
+            What's actually live on your domain.
+          </h2>
+          <p className="text-base text-muted-foreground leading-relaxed">
+            Resolve DNS records across 15 global resolvers, audit email security posture, inspect TLS certificates, and read WHOIS — without an account.
+          </p>
+        </div>
+
+        <form onSubmit={onSubmit} className="max-w-2xl mx-auto">
+          <div className="relative premium-surface premium-card rounded-2xl p-2 flex items-center gap-2">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              autoFocus
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="example.com"
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              className="flex-1 h-12 pl-12 pr-3 bg-transparent text-base font-medium placeholder:text-muted-foreground/50 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!domain.trim() || loading}
+              className="btn-primary h-12 px-6 rounded-xl flex items-center gap-2 text-sm"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              Run check
+            </button>
+          </div>
+          {submitted && (
+            <p className="text-xs text-muted-foreground mt-3 text-center">
+              Inspecting <code className="text-orange-300">{submitted}</code>
+            </p>
+          )}
+        </form>
+      </section>
+
+      {/* Tabs */}
+      {submitted && (
+        <section className="container mx-auto px-6">
+          <div className="overflow-x-auto -mx-2 px-2">
+            <div className="flex gap-2 pb-2 min-w-max">
+              {TABS.map((t) => {
+                const active = t.key === tab;
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => setTab(t.key)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap border ${active ? 'bg-orange-500/10 text-orange-300 border-orange-500/30' : 'bg-white/[0.02] text-muted-foreground border-white/5 hover:bg-white/[0.04] hover:text-foreground'}`}
+                  >
+                    <Icon className="w-4 h-4" /> {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Results */}
+      <section className="container mx-auto px-6 py-8">
+        {!submitted && (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+            {TABS.map((t) => {
+              const Icon = t.icon;
+              return (
+                <div key={t.key} className="premium-surface premium-card rounded-xl p-5">
+                  <Icon className="w-5 h-5 text-orange-400 mb-3" />
+                  <p className="font-display font-bold text-sm tracking-tight mb-1">{t.label}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{t.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {submitted && error && (
+          <div className="max-w-3xl mx-auto p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-200">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {submitted && loading && !data && (
+          <div className="max-w-3xl mx-auto premium-surface rounded-2xl p-12 text-center">
+            <Loader2 className="w-8 h-8 mx-auto text-orange-400 animate-spin mb-3" />
+            <p className="text-sm text-muted-foreground">Running check…</p>
+          </div>
+        )}
+
+        {submitted && data && (
+          <div className="max-w-5xl mx-auto">
+            {tab === "lookup" && <LookupView data={data} />}
+            {tab === "propagation" && <PropagationView data={data} type={propType} setType={setPropType} />}
+            {tab === "email" && <EmailView data={data} />}
+            {tab === "tls" && <TlsView data={data} />}
+            {tab === "whois" && <WhoisView data={data} />}
+            {tab === "headers" && <HeadersView data={data} />}
+            {tab === "blacklist" && <BlacklistView data={data} />}
+            {tab === "dnssec" && <DnssecView data={data} />}
+          </div>
+        )}
+      </section>
+
+      {/* Footer */}
+      <footer className="container mx-auto px-6 py-10 mt-16 border-t border-white/5">
+        <div className="text-center text-xs text-muted-foreground">
+          <p className="font-display font-semibold text-foreground mb-1">Nexus DNS</p>
+          <p>Free public lookup tool · No account required · No data stored.</p>
+          <p className="mt-2">Part of the <a href="https://segbytes.co.za" className="text-orange-300 hover:text-orange-200">Segbytes</a> family.</p>
+        </div>
+      </footer>
+    </main>
+  );
+}
+
+// ---------- Sub-views ----------
+
+function LookupView({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <p className="eyebrow mb-1">DNS records</p>
+          <h3 className="font-display text-xl font-bold tracking-tight">{data.domain}</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">{data.elapsed_ms}ms</p>
+      </div>
+      <div className="grid gap-3">
+        {data.results.map((r: any) => (
+          <div key={r.type} className="premium-surface premium-card rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="font-display font-bold text-sm tracking-tight">{r.type}</span>
+                {r.error && <span className="pill pill-fail">{r.error}</span>}
+                {!r.error && r.records?.length === 0 && <span className="pill pill-neutral">empty</span>}
+              </div>
+              <span className="text-xs text-muted-foreground">{r.records?.length || 0} record{r.records?.length === 1 ? '' : 's'}</span>
+            </div>
+            {r.records?.length > 0 && (
+              <div className="space-y-1.5">
+                {r.records.map((rec: any, i: number) => (
+                  <div key={i} className="font-mono text-xs text-foreground/90 bg-white/[0.02] border border-white/5 rounded-md px-3 py-2 break-all">
+                    {typeof rec === "string" ? rec : JSON.stringify(rec)}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PropagationView({ data, type, setType }: { data: any; type: string; setType: (t: any) => void }) {
+  const types = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <p className="eyebrow mb-1">Propagation</p>
+          <h3 className="font-display text-xl font-bold tracking-tight">{data.domain}</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            {data.consensus.agreeing}/{data.consensus.total} resolvers agree · {data.elapsed_ms}ms
+          </p>
+        </div>
+        <div className="flex gap-1.5 flex-wrap">
+          {types.map((t) => (
+            <button
+              key={t}
+              onClick={() => setType(t)}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wider ${type === t ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'bg-white/[0.03] text-muted-foreground border border-white/5 hover:text-foreground'}`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <WorldMap resolvers={data.resolvers} />
+
+      <div className="space-y-1.5">
+        {data.resolvers.map((r: any) => (
+          <div key={r.resolver.id} className="premium-surface premium-card rounded-xl p-3 flex items-center gap-3">
+            <span className={`w-2 h-2 rounded-full ${!r.ok ? 'bg-red-400' : r.consensus ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-display font-semibold text-sm tracking-tight">{r.resolver.name}</span>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{r.resolver.city}, {r.resolver.country}</span>
+                <span className="text-[10px] font-mono text-muted-foreground/70">{r.resolver.ip}</span>
+              </div>
+              <div className="font-mono text-xs text-foreground/80 mt-1 truncate">
+                {r.ok ? (r.records.length > 0 ? r.records.join(", ") : "—") : <span className="text-red-300">{r.error}</span>}
+              </div>
+            </div>
+            <span className="text-xs text-muted-foreground flex-shrink-0 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> {r.latency_ms}ms
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EmailView({ data }: { data: any }) {
+  const Block = ({ title, present, children, className = "" }: any) => (
+    <div className={`premium-surface premium-card rounded-xl p-5 ${className}`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {present ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-muted-foreground" />}
+          <span className="font-display font-bold text-sm tracking-tight">{title}</span>
+        </div>
+        <span className={`pill ${present ? 'pill-pass' : 'pill-neutral'}`}>{present ? 'present' : 'missing'}</span>
+      </div>
+      {children}
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="eyebrow mb-1">Email security</p>
+        <h3 className="font-display text-xl font-bold tracking-tight">{data.domain}</h3>
+        <p className="text-xs text-muted-foreground mt-1">{data.elapsed_ms}ms</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-3">
+        <Block title="SPF" present={data.spf.present}>
+          {data.spf.present && (
+            <>
+              <p className="font-mono text-xs bg-white/[0.02] border border-white/5 rounded-md px-3 py-2 break-all">{data.spf.record}</p>
+              <div className="flex gap-3 mt-3 text-xs text-muted-foreground">
+                <span>All: <code className="text-foreground">{data.spf.all_qualifier || '—'}</code></span>
+                <span>Lookups: <code className={data.spf.rfc7208_lookup_overflow ? 'text-red-300' : 'text-foreground'}>{data.spf.dns_lookups}/10</code></span>
+              </div>
+            </>
+          )}
+        </Block>
+
+        <Block title="DMARC" present={data.dmarc.present}>
+          {data.dmarc.present && (
+            <>
+              <p className="font-mono text-xs bg-white/[0.02] border border-white/5 rounded-md px-3 py-2 break-all">{data.dmarc.record}</p>
+              <div className="flex gap-3 mt-3 text-xs text-muted-foreground flex-wrap">
+                <span>Policy: <code className={data.dmarc.enforced ? 'text-emerald-300' : 'text-amber-300'}>{data.dmarc.policy}</code></span>
+                <span>Pct: <code className="text-foreground">{data.dmarc.pct}%</code></span>
+                {data.dmarc.rua && <span className="text-[10px]">rua: {data.dmarc.rua}</span>}
+              </div>
+            </>
+          )}
+        </Block>
+
+        <Block title="DKIM" present={data.dkim.found.length > 0}>
+          {data.dkim.found.length > 0 ? (
+            <div className="space-y-1.5">
+              {data.dkim.found.map((d: any) => (
+                <div key={d.selector} className="flex items-baseline gap-2 text-xs">
+                  <span className="text-muted-foreground">selector:</span>
+                  <code className="text-orange-300">{d.selector}</code>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Tried {data.dkim.selectors_checked.length} common selectors. None responded.</p>
+          )}
+        </Block>
+
+        <Block title="MX" present={data.mx.present}>
+          {data.mx.present && (
+            <div className="space-y-1">
+              {data.mx.records.map((m: any, i: number) => (
+                <div key={i} className="flex items-baseline gap-3 text-xs font-mono">
+                  <span className="text-muted-foreground">{m.priority}</span>
+                  <span>{m.exchange}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Block>
+
+        <Block title="MTA-STS" present={data.mta_sts.present} />
+        <Block title="TLS-RPT" present={data.tls_rpt.present} />
+        <Block title="BIMI" present={data.bimi.present} className="md:col-span-2" />
+      </div>
+    </div>
+  );
+}
+
+function TlsView({ data }: { data: any }) {
+  if (data.error) {
+    return (
+      <div className="premium-surface rounded-xl p-6">
+        <p className="text-sm text-red-300">{data.error}</p>
+        <p className="text-xs text-muted-foreground mt-2">{data.detail}</p>
+      </div>
+    );
+  }
+  const cert = data.certificate;
+  const expiryColor = cert.expired ? 'text-red-300' : cert.days_to_expiry < 30 ? 'text-amber-300' : 'text-emerald-300';
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="eyebrow mb-1">TLS / SSL</p>
+        <h3 className="font-display text-xl font-bold tracking-tight">{data.host}:{data.port}</h3>
+        <p className="text-xs text-muted-foreground mt-1">{data.peer_address} · {data.protocol} · {data.cipher?.name}</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-3">
+        <div className="premium-surface rounded-xl p-5">
+          <p className="eyebrow mb-2">Validity</p>
+          <p className={`font-display text-2xl font-bold ${expiryColor}`}>
+            {cert.expired ? 'Expired' : `${cert.days_to_expiry} days`}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">until {new Date(cert.valid_to).toLocaleDateString()}</p>
+        </div>
+        <div className="premium-surface rounded-xl p-5">
+          <p className="eyebrow mb-2">Authorized</p>
+          <p className={`font-display text-2xl font-bold ${data.authorized ? 'text-emerald-300' : 'text-red-300'}`}>
+            {data.authorized ? 'Yes' : 'No'}
+          </p>
+          {data.authorization_error && <p className="text-xs text-red-300 mt-1">{data.authorization_error}</p>}
+        </div>
+        <div className="premium-surface rounded-xl p-5">
+          <p className="eyebrow mb-2">Cipher</p>
+          <p className="font-mono text-sm">{data.cipher?.name}</p>
+          <p className="text-xs text-muted-foreground">{data.cipher?.bits} bit · {data.cipher?.version}</p>
+        </div>
+        <div className="premium-surface rounded-xl p-5">
+          <p className="eyebrow mb-2">ALPN</p>
+          <p className="font-mono text-sm">{data.alpn || '—'}</p>
+          <p className="text-xs text-muted-foreground">Chain length: {data.chain_length}</p>
+        </div>
+      </div>
+
+      <div className="premium-surface rounded-xl p-5">
+        <p className="eyebrow mb-3">Certificate chain</p>
+        <div className="space-y-2">
+          {data.chain.map((c: any, i: number) => (
+            <div key={i} className="bg-white/[0.02] border border-white/5 rounded-md p-3">
+              <p className="font-mono text-xs text-foreground/90 break-all">{c.subject?.CN || JSON.stringify(c.subject)}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">issued by {c.issuer?.CN || c.issuer?.O}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {cert.subject_alt_names && (
+        <div className="premium-surface rounded-xl p-5">
+          <p className="eyebrow mb-2">Subject Alternative Names</p>
+          <div className="flex flex-wrap gap-1.5">
+            {String(cert.subject_alt_names).split(",").map((s: string) => (
+              <span key={s} className="font-mono text-xs px-2 py-0.5 rounded bg-white/[0.04] border border-white/5">{s.trim().replace(/^DNS:/, '')}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WhoisView({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="eyebrow mb-1">WHOIS</p>
+        <h3 className="font-display text-xl font-bold tracking-tight">{data.domain}</h3>
+        <p className="text-xs text-muted-foreground mt-1">{data.elapsed_ms}ms</p>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {[
+          { k: 'Registrar', v: data.registrar },
+          { k: 'Created', v: data.created },
+          { k: 'Updated', v: data.updated },
+          { k: 'Expires', v: data.expires },
+          { k: 'IANA ID', v: data.registrar_iana },
+          { k: 'DNSSEC', v: data.dnssec },
+        ].map((row) => (
+          <div key={row.k} className="premium-surface rounded-xl p-4">
+            <p className="eyebrow mb-1">{row.k}</p>
+            <p className="text-sm font-medium">{row.v || '—'}</p>
+          </div>
+        ))}
+      </div>
+      {data.nameservers?.length > 0 && (
+        <div className="premium-surface rounded-xl p-5">
+          <p className="eyebrow mb-2">Name servers</p>
+          <div className="flex flex-wrap gap-2">
+            {data.nameservers.map((ns: string) => (
+              <span key={ns} className="font-mono text-xs px-2 py-1 rounded bg-white/[0.04] border border-white/5">{ns}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {data.status?.length > 0 && (
+        <div className="premium-surface rounded-xl p-5">
+          <p className="eyebrow mb-2">Status</p>
+          <div className="flex flex-wrap gap-2">
+            {data.status.map((s: string) => (
+              <span key={s} className="text-xs px-2 py-1 rounded bg-white/[0.04] border border-white/5">{s}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HeadersView({ data }: { data: any }) {
+  const gradeColor = data.grade === 'A' ? 'text-emerald-300' : data.grade === 'B' ? 'text-emerald-300' : data.grade === 'C' ? 'text-amber-300' : 'text-red-300';
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <p className="eyebrow mb-1">HTTP security headers</p>
+          <h3 className="font-display text-xl font-bold tracking-tight">{data.domain}</h3>
+        </div>
+        <div className="text-right">
+          <p className={`font-display text-5xl font-bold tracking-tighter ${gradeColor}`}>{data.grade}</p>
+          <p className="text-xs text-muted-foreground">{data.score}/100</p>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        {data.checks.map((c: any) => (
+          <div key={c.header} className="premium-surface premium-card rounded-xl p-4 flex items-center gap-3">
+            {c.present ? <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" /> : <XCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-display font-semibold text-sm tracking-tight">{c.name}</span>
+                <span className={`pill pill-${c.importance === 'critical' ? 'fail' : c.importance === 'high' ? 'warn' : 'neutral'}`}>{c.importance}</span>
+              </div>
+              {c.present && <p className="font-mono text-[11px] text-muted-foreground truncate mt-0.5">{c.value}</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BlacklistView({ data }: { data: any }) {
+  const groups = data.results_per_ip || (data.results ? [data] : []);
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="eyebrow mb-1">DNSBL check</p>
+        <h3 className="font-display text-xl font-bold tracking-tight">{data.domain || data.ip}</h3>
+      </div>
+      {groups.map((g: any, i: number) => (
+        <div key={i} className="premium-surface rounded-xl p-5">
+          <p className="font-display font-bold text-sm tracking-tight mb-3">
+            {g.ip}
+            {' · '}
+            <span className={g.listed_count > 0 ? 'text-red-300' : 'text-emerald-300'}>{g.listed_count}/{g.total_checked} listed</span>
+          </p>
+          <div className="grid sm:grid-cols-2 gap-1.5">
+            {g.results.map((r: any) => (
+              <div key={r.id} className={`flex items-center gap-2 p-2 rounded-md border text-xs ${r.listed ? 'bg-red-500/5 border-red-500/30 text-red-200' : 'bg-white/[0.02] border-white/5 text-muted-foreground'}`}>
+                {r.listed ? <AlertTriangle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3 opacity-50" />}
+                <span className="flex-1 truncate">{r.name}</span>
+                {r.listed && <span className="text-[10px] uppercase tracking-wider">listed</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DnssecView({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="eyebrow mb-1">DNSSEC</p>
+        <h3 className="font-display text-xl font-bold tracking-tight">{data.domain}</h3>
+        <p className="text-xs text-muted-foreground mt-1">{data.elapsed_ms}ms</p>
+      </div>
+      <div className="premium-surface rounded-xl p-6 text-center">
+        {data.signed ? (
+          <>
+            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+            <p className="font-display text-xl font-bold tracking-tight">Signed</p>
+            <p className="text-xs text-muted-foreground mt-1">DNSKEY at apex + DS at parent zone present</p>
+          </>
+        ) : (
+          <>
+            <XCircle className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+            <p className="font-display text-xl font-bold tracking-tight">Not signed</p>
+            <p className="text-xs text-muted-foreground mt-1">No DNSKEY/DS chain detected</p>
+          </>
+        )}
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="premium-surface rounded-xl p-4">
+          <p className="eyebrow mb-1">DNSKEY</p>
+          <p className="font-display text-2xl font-bold">{data.dnskey_count}</p>
+          <p className="text-xs text-muted-foreground">at zone apex</p>
+        </div>
+        <div className="premium-surface rounded-xl p-4">
+          <p className="eyebrow mb-1">DS</p>
+          <p className="font-display text-2xl font-bold">{data.ds_count}</p>
+          <p className="text-xs text-muted-foreground">at parent zone</p>
+        </div>
+      </div>
+      <p className="text-[11px] text-muted-foreground italic text-center max-w-lg mx-auto">
+        {data.note}
+      </p>
+    </div>
+  );
+}

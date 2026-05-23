@@ -1,0 +1,33 @@
+# Build / runtime
+node_modules/
+.next/
+dist/
+build/
+out/
+*.log
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Environment — never commit secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.production
+.env.local
+.env.*.local
+.envrc
+secrets.*
+*.secret
+*credentials*.json
+*.pem
+*.key
+!*.public.key
+
+# Caches
+.cache/
+*.tsbuildinfo
