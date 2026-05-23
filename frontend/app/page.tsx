@@ -235,6 +235,7 @@ export default function Home() {
 // ---------- Sub-views ----------
 
 function LookupView({ data }: { data: any }) {
+  if (!data?.results) return null;
   return (
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-4 flex-wrap">
@@ -273,6 +274,7 @@ function LookupView({ data }: { data: any }) {
 
 function PropagationView({ data, type, setType }: { data: any; type: string; setType: (t: any) => void }) {
   const types = ["A", "AAAA", "CNAME", "MX", "NS", "TXT"];
+  if (!data?.consensus || !data?.resolvers) return null;
   return (
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-4 flex-wrap">
@@ -323,6 +325,7 @@ function PropagationView({ data, type, setType }: { data: any; type: string; set
 }
 
 function EmailView({ data }: { data: any }) {
+  if (!data?.spf || !data?.dmarc || !data?.dkim) return null;
   const Block = ({ title, present, children, className = "" }: any) => (
     <div className={`premium-surface premium-card rounded-xl p-5 ${className}`}>
       <div className="flex items-center justify-between mb-3">
@@ -407,6 +410,7 @@ function EmailView({ data }: { data: any }) {
 }
 
 function TlsView({ data }: { data: any }) {
+  if (!data?.host && !data?.error) return null;
   if (data.error) {
     return (
       <div className="premium-surface rounded-xl p-6">
@@ -479,6 +483,7 @@ function TlsView({ data }: { data: any }) {
 }
 
 function WhoisView({ data }: { data: any }) {
+  if (!data?.domain && !data?.registrar) return null;
   return (
     <div className="space-y-4">
       <div>
@@ -526,6 +531,7 @@ function WhoisView({ data }: { data: any }) {
 }
 
 function HeadersView({ data }: { data: any }) {
+  if (!data?.checks) return null;
   const gradeColor = data.grade === 'A' ? 'text-emerald-300' : data.grade === 'B' ? 'text-emerald-300' : data.grade === 'C' ? 'text-amber-300' : 'text-red-300';
   return (
     <div className="space-y-4">
@@ -558,6 +564,7 @@ function HeadersView({ data }: { data: any }) {
 }
 
 function BlacklistView({ data }: { data: any }) {
+  if (!data?.results_per_ip && !data?.results) return null;
   const groups = data.results_per_ip || (data.results ? [data] : []);
   return (
     <div className="space-y-4">
@@ -588,6 +595,7 @@ function BlacklistView({ data }: { data: any }) {
 }
 
 function DnssecView({ data }: { data: any }) {
+  if (!data?.domain || data.signed === undefined) return null;
   return (
     <div className="space-y-4">
       <div>
@@ -630,6 +638,7 @@ function DnssecView({ data }: { data: any }) {
 }
 
 function PingView({ data }: { data: any }) {
+  if (!data?.samples) return null;
   const stats = data.stats || {};
   return (
     <div className="space-y-4">
@@ -671,6 +680,7 @@ function PingView({ data }: { data: any }) {
 }
 
 function PortCheckView({ data }: { data: any }) {
+  if (!data?.results) return null;
   return (
     <div className="space-y-4">
       <div>
@@ -710,6 +720,7 @@ function PortCheckView({ data }: { data: any }) {
 }
 
 function ProbeView({ data }: { data: any }) {
+  if (!data?.chain) return null;
   return (
     <div className="space-y-4">
       <div>
@@ -759,6 +770,7 @@ function ProbeView({ data }: { data: any }) {
 }
 
 function TracerouteView({ data }: { data: any }) {
+  if (!data?.hops) return null;
   return (
     <div className="space-y-4">
       <div>
@@ -785,6 +797,7 @@ function TracerouteView({ data }: { data: any }) {
 }
 
 function GeoIPView({ data }: { data: any }) {
+  if (!data?.ip) return null;
   return (
     <div className="space-y-4">
       <div>
