@@ -40,7 +40,7 @@ export function WorldMap({ resolvers, loading }: Props) {
       container: containerRef.current,
       style: "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json",
       center: [20, 20],
-      zoom: 1.4,
+      zoom: 0.9,
       attributionControl: false,
       renderWorldCopies: false,
       interactive: false,
