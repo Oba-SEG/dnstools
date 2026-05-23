@@ -488,49 +488,17 @@ function TlsView({ data }: { data: any }) {
 }
 
 function WhoisView({ data }: { data: any }) {
-  if (!data?.domain && !data?.registrar) return null;
+  if (!data?.domain && !data?.raw) return null;
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div>
         <p className="eyebrow mb-1">WHOIS</p>
-        <h3 className="font-display text-xl font-bold tracking-tight">{data.domain}</h3>
-        <p className="text-xs text-muted-foreground mt-1">{data.elapsed_ms}ms</p>
+        <h3 className="font-display text-lg font-bold tracking-tight">{data.domain}</h3>
+        <p className="text-[11px] text-muted-foreground mt-0.5">{data.elapsed_ms}ms</p>
       </div>
-      <div className="grid sm:grid-cols-2 gap-3">
-        {[
-          { k: 'Registrar', v: data.registrar },
-          { k: 'Created', v: data.created },
-          { k: 'Updated', v: data.updated },
-          { k: 'Expires', v: data.expires },
-          { k: 'IANA ID', v: data.registrar_iana },
-          { k: 'DNSSEC', v: data.dnssec },
-        ].map((row) => (
-          <div key={row.k} className="premium-surface rounded-xl p-4">
-            <p className="eyebrow mb-1">{row.k}</p>
-            <p className="text-sm font-medium">{row.v || '—'}</p>
-          </div>
-        ))}
-      </div>
-      {data.nameservers?.length > 0 && (
-        <div className="premium-surface rounded-xl p-5">
-          <p className="eyebrow mb-2">Name servers</p>
-          <div className="flex flex-wrap gap-2">
-            {data.nameservers.map((ns: string) => (
-              <span key={ns} className="font-mono text-xs px-2 py-1 rounded bg-white/[0.04] border border-white/5">{ns}</span>
-            ))}
-          </div>
-        </div>
-      )}
-      {data.status?.length > 0 && (
-        <div className="premium-surface rounded-xl p-5">
-          <p className="eyebrow mb-2">Status</p>
-          <div className="flex flex-wrap gap-2">
-            {data.status.map((s: string) => (
-              <span key={s} className="text-xs px-2 py-1 rounded bg-white/[0.04] border border-white/5">{s}</span>
-            ))}
-          </div>
-        </div>
-      )}
+      <pre className="premium-surface rounded-xl p-4 font-mono text-[11px] text-foreground/85 whitespace-pre-wrap break-all max-h-[500px] overflow-y-auto leading-relaxed">
+        {data.raw || JSON.stringify(data, null, 2)}
+      </pre>
     </div>
   );
 }

@@ -44,6 +44,7 @@ async function lookupWhois(target) {
     status: toArray(data.domain_status || data.status),
     nameservers: toArray(data.name_server || data.nserver),
     dnssec: pick('dnssec') || null,
+    raw: stdout,
   };
 }
 
