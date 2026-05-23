@@ -9,7 +9,7 @@ import { WorldMap } from "@/components/world-map";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 
-type TabKey = "lookup" | "propagation" | "email" | "tls" | "whois" | "headers" | "blacklist" | "dnssec";
+type TabKey = "lookup" | "propagation" | "email" | "tls" | "whois" | "headers" | "blacklist" | "dnssec" | "ping" | "portcheck" | "probe" | "traceroute" | "geoip";
 
 const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
   { key: "lookup",      label: "DNS records",   icon: Globe,       desc: "All record types (A, AAAA, MX, NS, TXT, SOA, SRV, CAA)" },
@@ -20,6 +20,11 @@ const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
   { key: "headers",     label: "HTTP headers",  icon: ShieldCheck, desc: "Security header grade (HSTS, CSP, etc.)" },
   { key: "blacklist",   label: "Blacklists",    icon: AlertTriangle, desc: "Check against 10 major DNSBLs" },
   { key: "dnssec",      label: "DNSSEC",        icon: Network,     desc: "DNSKEY + DS presence" },
+  { key: "ping",        label: "Ping",          icon: Radio,       desc: "TCP RTT timing, 5-sample average" },
+  { key: "portcheck",   label: "Port check",    icon: Server,      desc: "TCP reachability across 18 well-known ports" },
+  { key: "probe",       label: "HTTP probe",    icon: Server,      desc: "Status, headers, redirect chain, timing breakdown" },
+  { key: "traceroute",  label: "Traceroute",    icon: Network,     desc: "Hop-by-hop network path (TCP mode)" },
+  { key: "geoip",       label: "GeoIP / ASN",   icon: Map,         desc: "Country, region, city, coords, timezone" },
 ];
 
 export default function Home() {
@@ -38,7 +43,16 @@ export default function Home() {
     setData(null);
     try {
       const params = new URLSearchParams();
-      params.set(which === "blacklist" ? "ip" : "domain", target);
+      // Each endpoint uses a slightly different parameter name; map here.
+      const paramKey =
+        which === "blacklist" ? "ip" :
+        which === "ping" ? "host" :
+        which === "portcheck" ? "host" :
+        which === "probe" ? "url" :
+        which === "traceroute" ? "host" :
+        which === "geoip" ? "q" :
+        "domain";
+      params.set(paramKey, target);
       if (which === "propagation") params.set("type", propType);
       const res = await fetch(`${API}/${which}?${params.toString()}`);
       if (!res.ok) {
@@ -196,6 +210,11 @@ export default function Home() {
             {tab === "headers" && <HeadersView data={data} />}
             {tab === "blacklist" && <BlacklistView data={data} />}
             {tab === "dnssec" && <DnssecView data={data} />}
+            {tab === "ping" && <PingView data={data} />}
+            {tab === "portcheck" && <PortCheckView data={data} />}
+            {tab === "probe" && <ProbeView data={data} />}
+            {tab === "traceroute" && <TracerouteView data={data} />}
+            {tab === "geoip" && <GeoIPView data={data} />}
           </div>
         )}
       </section>
@@ -605,6 +624,194 @@ function DnssecView({ data }: { data: any }) {
       <p className="text-[11px] text-muted-foreground italic text-center max-w-lg mx-auto">
         {data.note}
       </p>
+    </div>
+  );
+}
+
+function PingView({ data }: { data: any }) {
+  const stats = data.stats || {};
+  return (
+    <div className="space-y-4">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <p className="eyebrow mb-1">TCP ping</p>
+          <h3 className="font-display text-xl font-bold tracking-tight">{data.target} <span className="text-muted-foreground text-sm">:{data.port}</span></h3>
+          <p className="text-xs text-muted-foreground mt-1 font-mono">{data.ip}</p>
+        </div>
+        <p className="text-xs text-muted-foreground">{data.elapsed_ms}ms</p>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { k: "Min", v: stats.min, unit: "ms", color: "text-emerald-300" },
+          { k: "Avg", v: stats.avg, unit: "ms", color: "text-foreground" },
+          { k: "Max", v: stats.max, unit: "ms", color: "text-amber-300" },
+          { k: "Loss", v: stats.loss_pct, unit: "%", color: stats.loss_pct === 0 ? "text-emerald-300" : "text-red-300" },
+        ].map((s) => (
+          <div key={s.k} className="premium-surface premium-card rounded-xl p-5">
+            <p className="eyebrow mb-1">{s.k}</p>
+            <p className={`font-display text-3xl font-bold tabular-nums ${s.color}`}>
+              {s.v ?? "—"}<span className="text-sm text-muted-foreground ml-1">{s.unit}</span>
+            </p>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-1.5">
+        {data.samples.map((s: any, i: number) => (
+          <div key={i} className="premium-surface premium-card rounded-xl p-3 flex items-center gap-3">
+            <span className={`w-2 h-2 rounded-full ${s.ok ? "bg-emerald-400" : "bg-red-400"}`} />
+            <span className="text-xs text-muted-foreground font-mono">#{i + 1}</span>
+            <div className="flex-1" />
+            <span className="text-sm font-mono tabular-nums">{s.ok ? `${s.ms} ms` : <span className="text-red-300">{s.error}</span>}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PortCheckView({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="eyebrow mb-1">Port check</p>
+        <h3 className="font-display text-xl font-bold tracking-tight">{data.target}</h3>
+        <p className="text-xs text-muted-foreground mt-1 font-mono">{data.ip}</p>
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {data.results.map((r: any) => {
+          const status = r.status || "error";
+          const cls =
+            status === "open" ? "border-emerald-500/30 bg-emerald-500/5" :
+            status === "closed" ? "border-white/5 bg-white/[0.02]" :
+            status === "filtered" ? "border-amber-500/30 bg-amber-500/5" :
+            "border-red-500/30 bg-red-500/5";
+          const text =
+            status === "open" ? "text-emerald-300" :
+            status === "closed" ? "text-muted-foreground" :
+            status === "filtered" ? "text-amber-300" :
+            "text-red-300";
+          return (
+            <div key={r.port} className={`rounded-xl border p-4 ${cls}`}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-display font-bold text-sm tracking-tight">{r.port}</span>
+                <span className={`pill pill-${status === "open" ? "pass" : status === "filtered" ? "warn" : "neutral"}`}>{status}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">{r.name}</p>
+              <p className={`text-xs mt-1 font-mono tabular-nums ${text}`}>
+                {status === "open" ? `${r.ms} ms` : (r.error || "—")}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ProbeView({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="eyebrow mb-1">HTTP probe</p>
+        <h3 className="font-display text-xl font-bold tracking-tight break-all">{data.initial_url}</h3>
+        <p className="text-xs text-muted-foreground mt-1">{data.hops} hop{data.hops === 1 ? "" : "s"} · {data.elapsed_ms}ms</p>
+      </div>
+      {data.chain.map((hop: any, i: number) => (
+        <div key={i} className="premium-surface premium-card rounded-xl p-5">
+          <div className="flex items-start justify-between mb-3 gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-xs text-foreground/90 break-all">{hop.url}</p>
+              <p className="text-xs text-muted-foreground mt-1 font-mono">via {hop.peer}</p>
+            </div>
+            <span className={`pill ${hop.status >= 200 && hop.status < 300 ? "pill-pass" : hop.status >= 300 && hop.status < 400 ? "pill-warn" : "pill-fail"}`}>{hop.status} {hop.status_text}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <div>
+              <p className="eyebrow mb-1">DNS</p>
+              <p className="font-mono text-sm tabular-nums">{hop.timing.dns_ms} ms</p>
+            </div>
+            <div>
+              <p className="eyebrow mb-1">TTFB</p>
+              <p className="font-mono text-sm tabular-nums">{hop.timing.ttfb_ms} ms</p>
+            </div>
+            <div>
+              <p className="eyebrow mb-1">Total</p>
+              <p className="font-mono text-sm tabular-nums">{hop.timing.total_ms} ms</p>
+            </div>
+          </div>
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Headers ({Object.keys(hop.headers).length})</summary>
+            <div className="mt-2 space-y-1 font-mono">
+              {Object.entries(hop.headers).map(([k, v]) => (
+                <div key={k} className="break-all">
+                  <span className="text-orange-300">{k}</span>
+                  <span className="text-muted-foreground">: </span>
+                  <span className="text-foreground/80">{Array.isArray(v) ? v.join(", ") : String(v)}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TracerouteView({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="eyebrow mb-1">Traceroute</p>
+        <h3 className="font-display text-xl font-bold tracking-tight">{data.target}</h3>
+        <p className="text-xs text-muted-foreground mt-1 font-mono">{data.ip} · {data.hop_count} hops · {data.elapsed_ms}ms</p>
+      </div>
+      <div className="space-y-1.5">
+        {data.hops.map((h: any) => (
+          <div key={h.hop} className={`premium-surface premium-card rounded-xl p-3 flex items-center gap-3 ${h.timeout ? "opacity-50" : ""}`}>
+            <span className="font-display font-bold text-sm tabular-nums w-8 text-muted-foreground">{h.hop}</span>
+            <span className={`w-2 h-2 rounded-full ${h.timeout ? "bg-muted" : "bg-orange-400"}`} />
+            <div className="flex-1 min-w-0">
+              <p className="font-mono text-sm">{h.timeout ? <span className="text-muted-foreground">* * *</span> : h.ip}</p>
+            </div>
+            {!h.timeout && h.rtt_ms != null && (
+              <span className="text-xs font-mono tabular-nums text-foreground/80">{h.rtt_ms.toFixed(2)} ms</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GeoIPView({ data }: { data: any }) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="eyebrow mb-1">GeoIP / ASN</p>
+        <h3 className="font-display text-xl font-bold tracking-tight">{data.target}</h3>
+        <p className="text-xs text-muted-foreground mt-1 font-mono">{data.ip}</p>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {[
+          { k: "Country", v: data.country_name ? `${data.country_name} (${data.country})` : data.country },
+          { k: "Region", v: data.region },
+          { k: "City", v: data.city },
+          { k: "Coordinates", v: data.coords?.lat != null ? `${data.coords.lat}, ${data.coords.lon}` : null },
+          { k: "Timezone", v: data.timezone },
+          { k: "Metro", v: data.metro || (data.eu ? "European Union" : null) },
+        ].map((row) => (
+          <div key={row.k} className="premium-surface rounded-xl p-4">
+            <p className="eyebrow mb-1">{row.k}</p>
+            <p className="text-sm font-medium">{row.v || "—"}</p>
+          </div>
+        ))}
+      </div>
+      {data.range && (
+        <div className="premium-surface rounded-xl p-4">
+          <p className="eyebrow mb-1">IP range</p>
+          <p className="font-mono text-xs">{data.range[0]} – {data.range[1]}</p>
+        </div>
+      )}
     </div>
   );
 }

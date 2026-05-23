@@ -87,6 +87,12 @@ app.use('/api/reverse', lookupLimiter, require('./routes/reverse'));
 app.use('/api/headers', heavyLimiter, require('./routes/headers'));
 app.use('/api/blacklist', heavyLimiter, require('./routes/blacklist'));
 app.use('/api/dnssec', lookupLimiter, require('./routes/dnssec'));
+// T2 — ping.pe-style network diagnostics
+app.use('/api/ping', heavyLimiter, require('./routes/ping'));
+app.use('/api/portcheck', heavyLimiter, require('./routes/portcheck'));
+app.use('/api/probe', heavyLimiter, require('./routes/probe'));
+app.use('/api/traceroute', heavyLimiter, require('./routes/traceroute'));
+app.use('/api/geoip', lookupLimiter, require('./routes/geoip'));
 
 // 404 for anything else
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
