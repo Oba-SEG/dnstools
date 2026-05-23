@@ -207,7 +207,7 @@ export default function Home() {
             </button>
           </div>
         )}
-        {!submitted && (
+        {!submitted && tab !== "mha" && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
             {TABS.map((t) => {
               const Icon = t.icon;
