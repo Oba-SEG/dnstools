@@ -32,7 +32,7 @@ function runTraceroute(ip) {
     // separately), -m limits hops, -w limits per-probe wait, -q limits
     // probes per hop. Use TCP mode (-T) on port 80 since UDP / ICMP often
     // get firewalled.
-    const args = ['-n', '-T', '-p', '80', '-w', '2', '-m', String(MAX_HOPS), '-q', '1', ip];
+    const args = ['-n', '-w', '2', '-m', String(MAX_HOPS), '-q', '1', ip];
     const proc = spawn('traceroute', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
     let stdout = '';
@@ -106,7 +106,7 @@ router.get('/', async (req, res) => {
     res.json({ ...result, elapsed_ms: Date.now() - started });
   } catch (err) {
     const code = err.code || 'traceroute-failed';
-    res.status(code === 'PRIVATE_TARGET' ? 400 : 502).json({ error: code, detail: err.message });
+    res.status(code === 'PRIVATE_TARGET' ? 400 : 422).json({ error: code, detail: err.message });
   }
 });
 
