@@ -90,7 +90,7 @@ export function WorldMap({ resolvers, loading }: Props) {
 
   return (
     <div className="relative w-full premium-surface rounded-2xl overflow-hidden">
-      <div ref={containerRef} className="w-full" style={{ height: "280px" }} />
+      <div ref={containerRef} className="w-full" style={{ height: "min(280px, 40vw)" }} />
 
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/30">
