@@ -81,7 +81,7 @@ router.get('/', async (req, res) => {
       const perIp = await Promise.all(ips.slice(0, 4).map(ip => cached(ip)));
       return res.json({ domain, results_per_ip: perIp, elapsed_ms: Date.now() - started });
     } catch (err) {
-      return res.status(502).json({ error: 'Domain resolution failed', detail: err.code || err.message });
+      return res.status(422).json({ error: 'Domain resolution failed', detail: err.code || err.message });
     }
   }
 

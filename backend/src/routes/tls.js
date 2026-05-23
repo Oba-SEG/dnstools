@@ -119,7 +119,7 @@ router.get('/', async (req, res) => {
     const result = await cachedInspect(target, port);
     res.json({ ...result, elapsed_ms: Date.now() - started });
   } catch (err) {
-    res.status(502).json({
+    res.status(422).json({
       host: target,
       port,
       error: err.code || err.message || 'TLS_FAILED',

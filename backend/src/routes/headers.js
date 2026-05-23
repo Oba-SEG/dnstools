@@ -111,7 +111,7 @@ router.get('/', async (req, res) => {
     const result = await cached(target);
     res.json({ ...result, elapsed_ms: Date.now() - started });
   } catch (err) {
-    res.status(502).json({ error: 'Header analysis failed', detail: err.code || err.message });
+    res.status(422).json({ error: 'Header analysis failed', detail: err.code || err.message });
   }
 });
 

@@ -163,7 +163,7 @@ router.get('/', async (req, res) => {
     const result = await cachedInspect(target);
     res.json({ ...result, elapsed_ms: Date.now() - started });
   } catch (err) {
-    res.status(500).json({ error: 'Email inspection failed', detail: err.code || err.message });
+    res.status(422).json({ error: 'Email inspection failed', detail: err.code || err.message });
   }
 });
 
