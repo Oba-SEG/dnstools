@@ -40,7 +40,7 @@ export function WorldMap({ resolvers, loading }: Props) {
       container: containerRef.current,
       style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
       center: [20, 20],
-      zoom: 1.2,
+      zoom: 1.5,
       attributionControl: false,
       renderWorldCopies: false,
       interactive: false,
@@ -90,7 +90,7 @@ export function WorldMap({ resolvers, loading }: Props) {
 
   return (
     <div className="relative w-full premium-surface rounded-2xl overflow-hidden">
-      <div ref={containerRef} className="w-full" style={{ height: "min(280px, 40vw)" }} />
+      <div ref={containerRef} className="w-full aspect-[2/1]" />
 
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/30">
