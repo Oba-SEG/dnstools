@@ -6,8 +6,8 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swa
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-display", display: "swap", weight: ["500", "600", "700", "800"] });
 
 export const metadata: Metadata = {
-  title: "Nexus DNS — DNS, email, TLS, WHOIS checker",
-  description: "Free, public DNS propagation, email security (SPF/DKIM/DMARC), TLS certificate, WHOIS, and headers checker. No login required.",
+  title: "Nexus Domain Tools — DNS, email, TLS, WHOIS, and more",
+  description: "Nexus Domain Tools — DNS propagation, email security (SPF/DKIM/DMARC), TLS certificate inspection, WHOIS, blacklists, security headers, and ping/traceroute. No login required.",
   robots: { index: true, follow: true },
 };
 

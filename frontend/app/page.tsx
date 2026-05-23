@@ -90,8 +90,7 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <div className="ndns-mark w-9 h-9 text-[13px]">N</div>
             <div className="leading-tight">
-              <p className="eyebrow">Free · public</p>
-              <h1 className="text-[15px] font-display font-bold tracking-tight">Nexus DNS</h1>
+              <h1 className="text-[15px] font-display font-bold tracking-tight">Nexus Domain Tools</h1>
             </div>
           </div>
           <a
@@ -108,7 +107,6 @@ export default function Home() {
       {/* Hero */}
       <section className="container mx-auto px-6 pt-16 pb-10">
         <div className="text-center max-w-2xl mx-auto mb-8">
-          <p className="eyebrow mb-3">DNS · email · TLS · WHOIS</p>
           <h2 className="font-display text-4xl sm:text-5xl font-bold tracking-tighter mb-4">
             What's actually live on your domain.
           </h2>
@@ -222,7 +220,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="container mx-auto px-6 py-10 mt-16 border-t border-white/5">
         <div className="text-center text-xs text-muted-foreground">
-          <p className="font-display font-semibold text-foreground mb-1">Nexus DNS</p>
+          <p className="font-display font-semibold text-foreground mb-1">Nexus Domain Tools</p>
           <p>Free public lookup tool · No account required · No data stored.</p>
           <p className="mt-2">Part of the <a href="https://segbytes.co.za" className="text-orange-300 hover:text-orange-200">Segbytes</a> family.</p>
         </div>
