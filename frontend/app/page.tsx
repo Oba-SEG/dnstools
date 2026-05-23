@@ -320,20 +320,16 @@ function PropagationView({ data, type, setType }: { data: any; type: string; set
   if (!data?.consensus || !data?.resolvers) return null;
   return (
     <div className="space-y-3">
-      <div className="flex items-end justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <p className="eyebrow mb-1">Propagation</p>
-          <h3 className="font-display text-lg font-bold tracking-tight">{data.domain}</h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            {data.consensus.agreeing}/{data.consensus.total} resolvers agree · {data.elapsed_ms}ms
-          </p>
+          <h3 className="font-display text-sm font-bold tracking-tight">{data.domain} <span className="text-muted-foreground font-normal">· {data.consensus.agreeing}/{data.consensus.total} agree · {data.elapsed_ms}ms</span></h3>
         </div>
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1">
           {types.map((t) => (
             <button
               key={t}
               onClick={() => setType(t)}
-              className={`px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider ${type === t ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'bg-white/[0.03] text-muted-foreground border border-white/5 hover:text-foreground'}`}
+              className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-wider ${type === t ? 'bg-orange-500/15 text-orange-300 border border-orange-500/30' : 'bg-white/[0.03] text-muted-foreground border border-white/[0.06] hover:text-foreground'}`}
             >
               {t}
             </button>
@@ -341,27 +337,25 @@ function PropagationView({ data, type, setType }: { data: any; type: string; set
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[1fr_1fr] gap-3">
-        {/* Results left */}
-        <div className="space-y-1 max-h-[420px] overflow-y-auto pr-1">
+      <div className="grid lg:grid-cols-[280px_1fr] gap-3">
+        {/* Compact results left */}
+        <div className="space-y-0.5 max-h-[460px] overflow-y-auto">
           {data.resolvers.map((r: any) => (
-            <div key={r.resolver.id} className="premium-surface premium-card rounded-lg p-2.5 flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${!r.ok ? 'bg-red-400' : r.consensus ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+            <div key={r.resolver.id} className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-white/[0.03] transition-colors">
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${!r.ok ? 'bg-red-400' : r.consensus ? 'bg-green-400' : 'bg-yellow-400'}`} />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-display font-semibold text-xs tracking-tight">{r.resolver.name}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-muted-foreground">{r.resolver.city}, {r.resolver.country}</span>
-                </div>
-                <div className="font-mono text-[11px] text-foreground/80 truncate">
-                  {r.ok ? (r.records.length > 0 ? r.records.join(", ") : "—") : <span className="text-red-300">{r.error}</span>}
-                </div>
+                <span className="text-[11px] font-medium">{r.resolver.name}</span>
+                <span className="text-[9px] text-muted-foreground ml-1">{r.resolver.country}</span>
+                <p className="font-mono text-[10px] text-foreground/60 truncate">
+                  {r.ok ? (r.records.length > 0 ? r.records.join(", ") : "—") : r.error}
+                </p>
               </div>
-              <span className="text-[10px] text-muted-foreground flex-shrink-0">{r.latency_ms}ms</span>
+              <span className="text-[9px] text-muted-foreground/60 tabular-nums">{r.latency_ms}ms</span>
             </div>
           ))}
         </div>
 
-        {/* Map right */}
+        {/* Map right - stretched */}
         <WorldMap resolvers={data.resolvers} />
       </div>
     </div>

@@ -39,14 +39,15 @@ export function WorldMap({ resolvers, loading }: Props) {
     const map = new MapLibreGL.Map({
       container: containerRef.current,
       style: "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json",
-      center: [20, 15],
-      zoom: 0.8,
+      center: [15, 20],
+      zoom: 1.1,
       attributionControl: false,
       renderWorldCopies: false,
       interactive: false,
+      fadeDuration: 0,
     });
 
-    map.on("load", () => {
+    map.on("style.load", () => {
       map.resize();
       setReady(true);
     });
@@ -55,63 +56,56 @@ export function WorldMap({ resolvers, loading }: Props) {
     return () => {
       map.remove();
       mapRef.current = null;
+      setReady(false);
     };
   }, []);
 
-  // Update markers when resolvers change
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
 
-    map.resize();
-
-    // Clear old markers
+    // Clear old
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    if (!resolvers) return;
+    if (!resolvers || resolvers.length === 0) return;
 
-    resolvers.forEach((r) => {
-      const color = !r.ok ? "#fca5a5" : r.consensus ? "#86efac" : "#fcd34d";
+    // Add markers
+    for (const r of resolvers) {
+      const color = !r.ok ? "#f87171" : r.consensus ? "#4ade80" : "#facc15";
 
       const el = document.createElement("div");
-      el.style.cssText = "position:relative;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:default;";
-      el.innerHTML = `
-        <div style="position:absolute;width:18px;height:18px;border-radius:50%;background:${color};opacity:0.12;"></div>
-        <div style="position:absolute;width:10px;height:10px;border-radius:50%;background:${color};opacity:0.35;"></div>
-        <div style="width:5px;height:5px;border-radius:50%;background:${color};"></div>
-      `;
-      el.title = `${r.resolver.name} · ${r.resolver.city}, ${r.resolver.country} · ${r.resolver.ip}`;
+      el.style.cssText = `width:14px;height:14px;position:relative;`;
+      el.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="7" fill="${color}" opacity="0.15"/><circle cx="7" cy="7" r="4" fill="${color}" opacity="0.4"/><circle cx="7" cy="7" r="2" fill="${color}"/></svg>`;
+      el.title = `${r.resolver.name} — ${r.resolver.city}, ${r.resolver.country}\n${r.resolver.ip}\n${r.ok ? (r.records?.join(", ") || "no records") : r.error}`;
 
       const marker = new MapLibreGL.Marker({ element: el, anchor: "center" })
         .setLngLat([r.resolver.lon, r.resolver.lat])
         .addTo(map);
 
       markersRef.current.push(marker);
-    });
-
-    // Fit map to show all resolver points
-    if (resolvers.length > 1) {
-      const bounds = new MapLibreGL.LngLatBounds();
-      resolvers.forEach((r) => bounds.extend([r.resolver.lon, r.resolver.lat]));
-      map.fitBounds(bounds, { padding: 40, maxZoom: 3, duration: 0 });
     }
+
+    // Fit to bounds
+    const bounds = new MapLibreGL.LngLatBounds();
+    resolvers.forEach((r) => bounds.extend([r.resolver.lon, r.resolver.lat]));
+    map.fitBounds(bounds, { padding: 50, maxZoom: 2.5, duration: 300 });
   }, [resolvers, ready]);
 
   return (
-    <div className="relative w-full premium-surface rounded-xl overflow-hidden">
-      <div ref={containerRef} style={{ width: "100%", height: "100%", minHeight: "380px" }} />
+    <div className="relative w-full h-full min-h-[450px] rounded-xl overflow-hidden border border-white/[0.06]" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 1px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04), 0 20px 60px -20px rgba(0,0,0,0.6)" }}>
+      <div ref={containerRef} className="absolute inset-0" />
 
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-10">
           <p className="text-[11px] text-white/50">Querying resolvers…</p>
         </div>
       )}
 
-      <div className="absolute bottom-2 left-2 right-2 flex items-center gap-3 text-[9px] uppercase tracking-widest text-muted-foreground/70 bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded border border-white/[0.04]">
-        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300" /> agree</span>
-        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-300" /> differ</span>
-        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-300" /> error</span>
+      <div className="absolute bottom-2.5 left-2.5 flex items-center gap-3 text-[9px] uppercase tracking-widest text-white/50 bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded z-10">
+        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400" /> agree</span>
+        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-yellow-400" /> differ</span>
+        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-400" /> error</span>
       </div>
     </div>
   );
