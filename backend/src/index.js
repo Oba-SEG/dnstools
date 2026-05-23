@@ -40,7 +40,7 @@ app.use(cors({
     return cb(null, false);
   },
   credentials: false,
-  methods: ['GET', 'OPTIONS'],
+  methods: ['GET', 'POST', 'OPTIONS'],
 }));
 
 // Tiny body limit — none of these endpoints accept request bodies, only
@@ -93,6 +93,7 @@ app.use('/api/portcheck', heavyLimiter, require('./routes/portcheck'));
 app.use('/api/probe', heavyLimiter, require('./routes/probe'));
 app.use('/api/traceroute', heavyLimiter, require('./routes/traceroute'));
 app.use('/api/geoip', lookupLimiter, require('./routes/geoip'));
+app.use('/api/mha', lookupLimiter, express.json({ limit: '256kb' }), require('./routes/mha'));
 
 // 404 for anything else
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));

@@ -9,7 +9,7 @@ import { WorldMap } from "@/components/world-map";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 
-type TabKey = "lookup" | "propagation" | "email" | "tls" | "whois" | "headers" | "blacklist" | "dnssec" | "ping" | "portcheck" | "probe" | "traceroute" | "geoip";
+type TabKey = "lookup" | "propagation" | "email" | "tls" | "whois" | "headers" | "blacklist" | "dnssec" | "ping" | "portcheck" | "probe" | "traceroute" | "geoip" | "mha";
 
 const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
   { key: "lookup",      label: "DNS records",   icon: Globe,       desc: "All record types (A, AAAA, MX, NS, TXT, SOA, SRV, CAA)" },
@@ -25,6 +25,7 @@ const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
   { key: "probe",       label: "HTTP probe",    icon: Server,      desc: "Status, headers, redirect chain, timing breakdown" },
   { key: "traceroute",  label: "Traceroute",    icon: Network,     desc: "Hop-by-hop network path (TCP mode)" },
   { key: "geoip",       label: "GeoIP / ASN",   icon: Map,         desc: "Country, region, city, coords, timezone" },
+  { key: "mha",         label: "Header analyzer", icon: Mail,      desc: "Parse email headers: hops, delays, auth, spam verdicts" },
 ];
 
 export default function Home() {
@@ -35,13 +36,27 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [propType, setPropType] = useState<"A" | "AAAA" | "CNAME" | "MX" | "NS" | "TXT">("A");
+  const [mhaInput, setMhaInput] = useState("");
 
   const run = async (which: TabKey, target: string) => {
-    if (!target) return;
+    if (!target && which !== "mha") return;
     setLoading(true);
     setError(null);
     setData(null);
     try {
+      if (which === "mha") {
+        const res = await fetch(`${API}/mha`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ headers: mhaInput }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        setData(await res.json());
+        return;
+      }
       const params = new URLSearchParams();
       // Each endpoint uses a slightly different parameter name; map here.
       const paramKey =
@@ -70,7 +85,7 @@ export default function Home() {
 
   // Re-run when tab or propType changes
   useEffect(() => {
-    if (submitted) {
+    if (submitted && tab !== "mha") {
       setData(null);
       run(tab, submitted);
     }
@@ -149,7 +164,7 @@ export default function Home() {
       </section>
 
       {/* Tabs */}
-      {submitted && (
+      {(submitted || tab === "mha") && (
         <section className="container mx-auto px-6">
           <div className="overflow-x-auto -mx-2 px-2">
             <div className="flex gap-2 pb-2 min-w-max">
@@ -173,6 +188,25 @@ export default function Home() {
 
       {/* Results */}
       <section className="container mx-auto px-6 py-8">
+        {/* MHA input */}
+        {tab === "mha" && (
+          <div className="max-w-5xl mx-auto mb-6">
+            <textarea
+              value={mhaInput}
+              onChange={(e) => setMhaInput(e.target.value)}
+              placeholder="Paste full email headers here..."
+              className="w-full h-48 premium-surface rounded-xl p-4 font-mono text-xs bg-transparent text-foreground placeholder:text-muted-foreground/50 focus:outline-none resize-y border border-white/10"
+            />
+            <button
+              onClick={() => run("mha", "")}
+              disabled={!mhaInput.trim() || loading}
+              className="btn-primary mt-2 px-5 py-2.5 rounded-xl text-sm flex items-center gap-2"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+              Analyze headers
+            </button>
+          </div>
+        )}
         {!submitted && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
             {TABS.map((t) => {
@@ -220,6 +254,7 @@ export default function Home() {
             {tab === "probe" && <ProbeView data={data} />}
             {tab === "traceroute" && <TracerouteView data={data} />}
             {tab === "geoip" && <GeoIPView data={data} />}
+            {tab === "mha" && <MHAView data={data} />}
           </div>
         )}
       </section>
@@ -797,6 +832,85 @@ function GeoIPView({ data }: { data: any }) {
         <div className="premium-surface rounded-xl p-4">
           <p className="eyebrow mb-1">IP range</p>
           <p className="font-mono text-xs">{data.range[0]} – {data.range[1]}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MHAView({ data }: { data: any }) {
+  if (!data?.hops && !data?.summary) return null;
+  const authColor = (r: string | null) => !r ? "text-muted-foreground" : r === "pass" ? "text-emerald-300" : r === "fail" ? "text-red-300" : "text-amber-300";
+  return (
+    <div className="space-y-4">
+      {/* Summary */}
+      {data.summary && (
+        <div className="premium-surface rounded-xl p-4">
+          <p className="eyebrow mb-2">Summary</p>
+          <div className="grid sm:grid-cols-2 gap-2 text-xs">
+            {data.summary.from && <div><span className="text-muted-foreground">From:</span> <span className="text-foreground break-all">{data.summary.from}</span></div>}
+            {data.summary.to && <div><span className="text-muted-foreground">To:</span> <span className="text-foreground break-all">{data.summary.to}</span></div>}
+            {data.summary.subject && <div className="sm:col-span-2"><span className="text-muted-foreground">Subject:</span> <span className="text-foreground">{data.summary.subject}</span></div>}
+            {data.summary.date && <div><span className="text-muted-foreground">Date:</span> <span className="text-foreground">{data.summary.date}</span></div>}
+            {data.summary.total_delay_str && <div><span className="text-muted-foreground">Transit time:</span> <span className="text-foreground">{data.summary.total_delay_str}</span></div>}
+          </div>
+        </div>
+      )}
+
+      {/* Auth */}
+      {data.auth && (
+        <div className="premium-surface rounded-xl p-4">
+          <p className="eyebrow mb-2">Authentication</p>
+          <div className="flex gap-4 text-xs flex-wrap">
+            <span>SPF: <strong className={authColor(data.auth.spf?.result)}>{data.auth.spf?.result || "—"}</strong></span>
+            <span>DKIM: <strong className={authColor(data.auth.dkim?.result)}>{data.auth.dkim?.result || "—"}</strong></span>
+            <span>DMARC: <strong className={authColor(data.auth.dmarc?.result)}>{data.auth.dmarc?.result || "—"}</strong></span>
+            {data.auth.arc && <span>ARC: <strong className="text-foreground">{data.auth.arc.count} header(s)</strong></span>}
+          </div>
+        </div>
+      )}
+
+      {/* Hops */}
+      {Array.isArray(data.hops) && data.hops.length > 0 && (
+        <div>
+          <p className="eyebrow mb-2">Message path ({data.hops.length} hops)</p>
+          <div className="space-y-1">
+            {data.hops.map((h: any, i: number) => (
+              <div key={i} className="premium-surface rounded-lg p-3">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-display font-bold text-muted-foreground w-5">{h.index}</span>
+                  <span className="font-mono text-foreground/90 flex-1 truncate">{h.by || h.from || "unknown"}</span>
+                  {h.delay_str && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${h.delay_ms > 30000 ? "bg-red-500/15 text-red-300" : h.delay_ms > 5000 ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}>
+                      +{h.delay_str}
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-3 mt-1 text-[10px] text-muted-foreground ml-7 flex-wrap">
+                  {h.from && <span>from: {h.from}</span>}
+                  {h.ip && <span>ip: {h.ip}</span>}
+                  {h.protocol && <span>with: {h.protocol}</span>}
+                  {h.date_str && <span>{h.date_str}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Anti-spam */}
+      {data.antispam && (
+        <div className="premium-surface rounded-xl p-4">
+          <p className="eyebrow mb-2">Anti-spam verdicts</p>
+          <div className="space-y-1 font-mono text-[11px]">
+            {Object.entries(data.antispam).filter(([k]) => !k.startsWith("_")).map(([k, v]) => (
+              <div key={k} className="break-all">
+                <span className="text-orange-300">{k}</span>
+                <span className="text-muted-foreground">: </span>
+                <span className="text-foreground/80">{String(v)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
