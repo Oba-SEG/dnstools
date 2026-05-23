@@ -38,15 +38,18 @@ export function WorldMap({ resolvers, loading }: Props) {
 
     const map = new MapLibreGL.Map({
       container: containerRef.current,
-      style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-      center: [20, 20],
-      zoom: 1.5,
+      style: "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json",
+      center: [20, 15],
+      zoom: 0.8,
       attributionControl: false,
       renderWorldCopies: false,
       interactive: false,
     });
 
-    map.on("load", () => setReady(true));
+    map.on("load", () => {
+      map.resize();
+      setReady(true);
+    });
     mapRef.current = map;
 
     return () => {
@@ -60,6 +63,8 @@ export function WorldMap({ resolvers, loading }: Props) {
     const map = mapRef.current;
     if (!map || !ready) return;
 
+    map.resize();
+
     // Clear old markers
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
@@ -70,17 +75,15 @@ export function WorldMap({ resolvers, loading }: Props) {
       const color = !r.ok ? "#fca5a5" : r.consensus ? "#86efac" : "#fcd34d";
 
       const el = document.createElement("div");
-      el.className = "resolver-marker";
+      el.style.cssText = "position:relative;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:default;";
       el.innerHTML = `
-        <div style="position:relative;display:flex;align-items:center;justify-content:center;">
-          <div style="width:24px;height:24px;border-radius:50%;background:${color};opacity:0.15;position:absolute;"></div>
-          <div style="width:12px;height:12px;border-radius:50%;background:${color};opacity:0.4;position:absolute;"></div>
-          <div style="width:7px;height:7px;border-radius:50%;background:${color};"></div>
-        </div>
+        <div style="position:absolute;width:18px;height:18px;border-radius:50%;background:${color};opacity:0.12;"></div>
+        <div style="position:absolute;width:10px;height:10px;border-radius:50%;background:${color};opacity:0.35;"></div>
+        <div style="width:5px;height:5px;border-radius:50%;background:${color};"></div>
       `;
-      el.title = `${r.resolver.name} (${r.resolver.city}, ${r.resolver.country}) — ${r.resolver.ip}`;
+      el.title = `${r.resolver.name} · ${r.resolver.city}, ${r.resolver.country} · ${r.resolver.ip}`;
 
-      const marker = new MapLibreGL.Marker({ element: el })
+      const marker = new MapLibreGL.Marker({ element: el, anchor: "center" })
         .setLngLat([r.resolver.lon, r.resolver.lat])
         .addTo(map);
 
@@ -89,20 +92,19 @@ export function WorldMap({ resolvers, loading }: Props) {
   }, [resolvers, ready]);
 
   return (
-    <div className="relative w-full premium-surface rounded-2xl overflow-hidden">
-      <div ref={containerRef} className="w-full aspect-[2/1]" />
+    <div className="relative w-full premium-surface rounded-xl overflow-hidden">
+      <div ref={containerRef} style={{ width: "100%", height: "220px" }} />
 
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-          <p className="text-sm text-white/60">Querying global resolvers…</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+          <p className="text-[11px] text-white/50">Querying resolvers…</p>
         </div>
       )}
 
-      {/* Legend */}
-      <div className="absolute bottom-3 left-3 right-3 flex items-center gap-4 text-[10px] uppercase tracking-widest text-muted-foreground bg-black/30 backdrop-blur px-3 py-1.5 rounded-md border border-white/5">
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-300" /> consensus</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-300" /> divergent</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-300" /> error</span>
+      <div className="absolute bottom-2 left-2 right-2 flex items-center gap-3 text-[9px] uppercase tracking-widest text-muted-foreground/70 bg-black/40 backdrop-blur-sm px-2.5 py-1 rounded border border-white/[0.04]">
+        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-300" /> agree</span>
+        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-300" /> differ</span>
+        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-300" /> error</span>
       </div>
     </div>
   );
