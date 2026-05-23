@@ -101,41 +101,43 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen relative">
       {/* Top bar */}
-      <header className="border-b border-white/5 bg-background/70 backdrop-blur-2xl sticky top-0 z-40">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="ndns-mark w-9 h-9 text-[13px]">N</div>
-            <div className="leading-tight">
-              <h1 className="text-[15px] font-display font-bold tracking-tight">Nexus Domain Tools</h1>
-            </div>
+      <header className="border-b border-white/[0.04] bg-[#060810]/80 backdrop-blur-xl sticky top-0 z-40">
+        <div className="container mx-auto px-6 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="ndns-mark w-8 h-8 text-[12px]">N</div>
+            <h1 className="text-[14px] font-display font-bold tracking-tight text-foreground/90">Nexus Domain Tools</h1>
           </div>
-          <a
-            href="https://brandprotection.segbytes.co.za"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-          >
-            Brand Protection <ChevronRight className="w-3 h-3" />
-          </a>
+          <div className="flex items-center gap-4">
+            <span className="hidden md:inline text-[10px] uppercase tracking-widest text-muted-foreground/60">Free · No login · No data stored</span>
+            <a
+              href="https://brandprotection.segbytes.co.za"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-orange-300 transition-colors"
+            >
+              Brand Protection <ChevronRight className="w-3 h-3" />
+            </a>
+          </div>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="container mx-auto px-6 pt-12 pb-8">
-        <div className="text-center max-w-2xl mx-auto mb-6">
-          <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tighter mb-3">
-            What's actually live on your domain.
+      <section className="container mx-auto px-6 pt-14 pb-8">
+        <div className="text-center max-w-xl mx-auto mb-8">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-orange-400/80 font-bold mb-3">DNS · Email · TLS · WHOIS · Network</p>
+          <h2 className="font-display text-3xl sm:text-[2.5rem] font-bold tracking-tighter leading-[1.1] mb-3">
+            What's actually live<br className="hidden sm:block" /> on your domain.
           </h2>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Resolve DNS records across 15 global resolvers, audit email security posture, inspect TLS certificates, and read WHOIS — without an account.
+          <p className="text-[13px] text-muted-foreground leading-relaxed max-w-md mx-auto">
+            15 global resolvers. Email auth audit. TLS inspection. Header analysis. All instant, no account.
           </p>
         </div>
 
-        <form onSubmit={onSubmit} className="max-w-2xl mx-auto">
-          <div className="relative premium-surface premium-card rounded-2xl p-2 flex items-center gap-2">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+        <form onSubmit={onSubmit} className="max-w-lg mx-auto">
+          <div className="relative premium-surface rounded-2xl p-1.5 flex items-center gap-1.5">
+            <Search className="absolute left-4.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none ml-1" />
             <input
               type="text"
               autoFocus
@@ -144,15 +146,15 @@ export default function Home() {
               placeholder="example.com"
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
-              className="flex-1 h-12 pl-12 pr-3 bg-transparent text-base font-medium placeholder:text-muted-foreground/50 focus:outline-none"
+              className="flex-1 h-11 pl-10 pr-3 bg-transparent text-sm font-medium placeholder:text-muted-foreground/40 focus:outline-none rounded-xl"
             />
             <button
               type="submit"
               disabled={!domain.trim() || loading}
-              className="btn-primary h-12 px-6 rounded-xl flex items-center gap-2 text-sm"
+              className="btn-primary h-11 px-5 rounded-xl flex items-center gap-2 text-xs font-bold"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              Run check
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+              Run
             </button>
           </div>
           {submitted && (
@@ -175,9 +177,9 @@ export default function Home() {
                   <button
                     key={t.key}
                     onClick={() => setTab(t.key)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap border ${active ? 'bg-orange-500/10 text-orange-300 border-orange-500/30' : 'bg-white/[0.02] text-muted-foreground border-white/5 hover:bg-white/[0.04] hover:text-foreground'}`}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap border ${active ? 'bg-orange-500/10 text-orange-300 border-orange-500/20 shadow-[0_0_12px_-3px_rgba(255,122,26,0.2)]' : 'bg-white/[0.02] text-muted-foreground/70 border-white/[0.04] hover:bg-white/[0.04] hover:text-foreground hover:border-white/10'}`}
                   >
-                    <Icon className="w-4 h-4" /> {t.label}
+                    <Icon className="w-3.5 h-3.5" /> {t.label}
                   </button>
                 );
               })}
@@ -260,11 +262,13 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-6 py-10 mt-16 border-t border-white/5">
-        <div className="text-center text-xs text-muted-foreground">
-          <p className="font-display font-semibold text-foreground mb-1">Nexus Domain Tools</p>
-          <p>Free public lookup tool · No account required · No data stored.</p>
-          <p className="mt-2">Part of the <a href="https://segbytes.co.za" className="text-orange-300 hover:text-orange-200">Segbytes</a> family.</p>
+      <footer className="container mx-auto px-6 py-8 mt-12 border-t border-white/[0.04]">
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground/60">
+          <div className="flex items-center gap-2">
+            <div className="ndns-mark w-5 h-5 text-[8px]">N</div>
+            <span>Nexus Domain Tools</span>
+          </div>
+          <span>Part of <a href="https://segbytes.co.za" className="text-orange-300/70 hover:text-orange-300">Segbytes</a></span>
         </div>
       </footer>
     </main>
