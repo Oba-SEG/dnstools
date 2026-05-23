@@ -44,8 +44,11 @@ app.use(cors({
 }));
 
 // Tiny body limit — none of these endpoints accept request bodies, only
-// query strings. Anything bigger is suspicious.
-app.use(express.json({ limit: '1kb' }));
+// query strings. Anything bigger is suspicious. MHA is the exception.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/mha')) return next();
+  express.json({ limit: '1kb' })(req, res, next);
+});
 
 // --- Rate limiting ---
 // Coarse global limit per IP; specific lookups have their own (tighter)
