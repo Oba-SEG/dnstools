@@ -70,7 +70,10 @@ export default function Home() {
 
   // Re-run when tab or propType changes
   useEffect(() => {
-    if (submitted) run(tab, submitted);
+    if (submitted) {
+      setData(null);
+      run(tab, submitted);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, propType]);
 
