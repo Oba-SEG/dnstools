@@ -337,24 +337,26 @@ function PropagationView({ data, type, setType }: { data: any; type: string; set
         </div>
       </div>
 
-      {/* Full-width map */}
-      <WorldMap resolvers={data.resolvers} />
+      <div className="grid lg:grid-cols-[1fr_300px] gap-3">
+        {/* Map left - takes most space */}
+        <WorldMap resolvers={data.resolvers} />
 
-      {/* Results table below */}
-      <div className="space-y-0.5">
-        {data.resolvers.map((r: any) => (
-          <div key={r.resolver.id} className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-white/[0.03] transition-colors">
-            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${!r.ok ? 'bg-red-400' : r.consensus ? 'bg-green-400' : 'bg-yellow-400'}`} />
-            <div className="min-w-0 flex-1">
-              <span className="text-[11px] font-medium">{r.resolver.name}</span>
-              <span className="text-[9px] text-muted-foreground ml-1">{r.resolver.city}, {r.resolver.country}</span>
-              <p className="font-mono text-[10px] text-foreground/60 truncate">
-                {r.ok ? (r.records.length > 0 ? r.records.join(", ") : "—") : r.error}
-              </p>
+        {/* Results right - compact scrollable list */}
+        <div className="space-y-0.5 max-h-[260px] overflow-y-auto">
+          {data.resolvers.map((r: any) => (
+            <div key={r.resolver.id} className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-white/[0.03] transition-colors">
+              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${!r.ok ? 'bg-red-400' : r.consensus ? 'bg-green-400' : 'bg-yellow-400'}`} />
+              <div className="min-w-0 flex-1">
+                <span className="text-[11px] font-medium">{r.resolver.name}</span>
+                <span className="text-[9px] text-muted-foreground ml-1">{r.resolver.country}</span>
+                <p className="font-mono text-[10px] text-foreground/60 truncate">
+                  {r.ok ? (r.records.length > 0 ? r.records.join(", ") : "—") : r.error}
+                </p>
+              </div>
+              <span className="text-[9px] text-muted-foreground/60 tabular-nums">{r.latency_ms}ms</span>
             </div>
-            <span className="text-[9px] text-muted-foreground/60 tabular-nums">{r.latency_ms}ms</span>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
