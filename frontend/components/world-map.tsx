@@ -39,8 +39,8 @@ export function WorldMap({ resolvers, loading }: Props) {
     const map = new MapLibreGL.Map({
       container: containerRef.current,
       style: "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json",
-      center: [15, 20],
-      zoom: 1.1,
+      center: [20, 25],
+      zoom: 1.3,
       attributionControl: false,
       renderWorldCopies: false,
       interactive: false,
@@ -93,7 +93,7 @@ export function WorldMap({ resolvers, loading }: Props) {
   }, [resolvers, ready]);
 
   return (
-    <div className="relative w-full h-full min-h-[450px] rounded-xl overflow-hidden border border-white/[0.06]" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 1px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04), 0 20px 60px -20px rgba(0,0,0,0.6)" }}>
+    <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.06]" style={{ height: "420px", background: "linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 1px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04), 0 20px 60px -20px rgba(0,0,0,0.6)" }}>
       <div ref={containerRef} className="absolute inset-0" />
 
       {loading && (
