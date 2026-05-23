@@ -1,38 +1,61 @@
 'use strict';
 
 const express = require('express');
-const whoisJson = require('whois-json');
-const { normaliseDomain } = require('../lib/validate');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
+const { normaliseDomain, classifyIp } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
 
+const execFileAsync = promisify(execFile);
 const router = express.Router();
 
-async function lookupWhois(domain) {
-  // whois-json wraps `whois` and is sufficient for the common TLDs.
-  const raw = await whoisJson(domain, { follow: 3, timeout: 10000 });
-  // Normalise common keys across registrar formats.
-  const pick = (...keys) => keys.map(k => raw[k]).find(v => v != null && v !== '');
+async function lookupWhois(target) {
+  const { stdout } = await execFileAsync('whois', [target], { timeout: 15000 });
+  const lines = stdout.split('\n');
+  const data = {};
+  for (const line of lines) {
+    const match = line.match(/^\s*([^:]+):\s*(.+)\s*$/);
+    if (match) {
+      const key = match[1].trim().toLowerCase().replace(/\s+/g, '_');
+      const val = match[2].trim();
+      if (data[key]) {
+        if (Array.isArray(data[key])) data[key].push(val);
+        else data[key] = [data[key], val];
+      } else {
+        data[key] = val;
+      }
+    }
+  }
+
+  const pick = (...keys) => {
+    for (const k of keys) { if (data[k]) return Array.isArray(data[k]) ? data[k][0] : data[k]; }
+    return null;
+  };
+  const toArray = (v) => v == null ? [] : Array.isArray(v) ? v : [v];
+
   return {
-    domain,
-    registrar: pick('registrar', 'sponsoringRegistrar') || null,
-    registrar_url: pick('registrarUrl') || null,
-    registrar_iana: pick('registrarIanaId') || null,
-    created: pick('creationDate', 'created', 'createdOn', 'registrationDate') || null,
-    updated: pick('updatedDate', 'lastUpdatedDate', 'updated') || null,
-    expires: pick('registrarRegistrationExpirationDate', 'expirationDate', 'registryExpiryDate', 'expires') || null,
-    status: Array.isArray(raw.domainStatus) ? raw.domainStatus : (raw.domainStatus ? [raw.domainStatus] : []),
-    nameservers: Array.isArray(raw.nameServer) ? raw.nameServer : (raw.nameServer ? [raw.nameServer] : []),
-    dnssec: raw.dnssec || raw.dnsSec || null,
-    raw_keys: Object.keys(raw).slice(0, 50),
+    domain: target,
+    registrar: pick('registrar', 'sponsoring_registrar', 'registrant') || null,
+    registrar_url: pick('registrar_url') || null,
+    registrar_iana: pick('registrar_iana_id') || null,
+    created: pick('creation_date', 'created', 'created_on', 'registration_date') || null,
+    updated: pick('updated_date', 'last_updated_date', 'updated', 'last-modified') || null,
+    expires: pick('registrar_registration_expiration_date', 'expiration_date', 'registry_expiry_date', 'expires', 'expire_date') || null,
+    status: toArray(data.domain_status || data.status),
+    nameservers: toArray(data.name_server || data.nserver),
+    dnssec: pick('dnssec') || null,
   };
 }
 
 const cached = memoizeAsync(lookupWhois, { ttl: 60 * 60_000, keyFn: (d) => d });
 
 router.get('/', async (req, res) => {
-  const target = normaliseDomain(req.query.domain || req.query.q);
+  const input = (req.query.domain || req.query.q || '').trim();
+  // Accept domain or IP
+  const ipCheck = classifyIp(input);
+  const target = ipCheck.valid ? input : normaliseDomain(input);
   if (!target) {
-    return res.status(400).json({ error: 'Provide a valid domain via ?domain=example.com' });
+    return res.status(400).json({ error: 'Provide a valid domain or IP via ?domain=example.com' });
   }
   try {
     const started = Date.now();
