@@ -226,20 +226,20 @@ export default function Home() {
           </div>
         )}
 
-        {submitted && error && (
+        {(submitted || tab === "mha") && error && (
           <div className="max-w-3xl mx-auto p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-200">
             <strong>Error:</strong> {error}
           </div>
         )}
 
-        {submitted && loading && !data && (
+        {(submitted || tab === "mha") && loading && !data && (
           <div className="max-w-3xl mx-auto premium-surface rounded-2xl p-12 text-center">
             <Loader2 className="w-8 h-8 mx-auto text-orange-400 animate-spin mb-3" />
             <p className="text-sm text-muted-foreground">Running check…</p>
           </div>
         )}
 
-        {submitted && data && (
+        {(submitted || tab === "mha") && data && (
           <div className="max-w-5xl mx-auto">
             {tab === "lookup" && <LookupView data={data} />}
             {tab === "propagation" && <PropagationView data={data} type={propType} setType={setPropType} />}
