@@ -239,7 +239,7 @@ export default function Home() {
 // ---------- Sub-views ----------
 
 function LookupView({ data }: { data: any }) {
-  if (!data?.results) return null;
+  if (!Array.isArray(data?.results)) return null;
   return (
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-4 flex-wrap">
@@ -643,7 +643,7 @@ function DnssecView({ data }: { data: any }) {
 }
 
 function PingView({ data }: { data: any }) {
-  if (!data?.samples) return null;
+  if (!Array.isArray(data?.samples)) return null;
   const stats = data.stats || {};
   return (
     <div className="space-y-4">
@@ -685,7 +685,7 @@ function PingView({ data }: { data: any }) {
 }
 
 function PortCheckView({ data }: { data: any }) {
-  if (!data?.results) return null;
+  if (!Array.isArray(data?.results)) return null;
   return (
     <div className="space-y-4">
       <div>
@@ -725,7 +725,7 @@ function PortCheckView({ data }: { data: any }) {
 }
 
 function ProbeView({ data }: { data: any }) {
-  if (!data?.chain) return null;
+  if (!Array.isArray(data?.chain)) return null;
   return (
     <div className="space-y-4">
       <div>
@@ -775,7 +775,7 @@ function ProbeView({ data }: { data: any }) {
 }
 
 function TracerouteView({ data }: { data: any }) {
-  if (!data?.hops) return null;
+  if (!Array.isArray(data?.hops)) return null;
   return (
     <div className="space-y-4">
       <div>
