@@ -89,11 +89,18 @@ export function WorldMap({ resolvers, loading }: Props) {
 
       markersRef.current.push(marker);
     });
+
+    // Fit map to show all resolver points
+    if (resolvers.length > 1) {
+      const bounds = new MapLibreGL.LngLatBounds();
+      resolvers.forEach((r) => bounds.extend([r.resolver.lon, r.resolver.lat]));
+      map.fitBounds(bounds, { padding: 40, maxZoom: 3, duration: 0 });
+    }
   }, [resolvers, ready]);
 
   return (
     <div className="relative w-full premium-surface rounded-xl overflow-hidden">
-      <div ref={containerRef} style={{ width: "100%", height: "220px" }} />
+      <div ref={containerRef} style={{ width: "100%", height: "100%", minHeight: "380px" }} />
 
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/40">
