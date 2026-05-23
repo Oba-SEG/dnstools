@@ -841,73 +841,154 @@ function GeoIPView({ data }: { data: any }) {
 function MHAView({ data }: { data: any }) {
   if (!data?.hops && !data?.summary) return null;
   const authColor = (r: string | null) => !r ? "text-muted-foreground" : r === "pass" ? "text-emerald-300" : r === "fail" ? "text-red-300" : "text-amber-300";
+  const authBg = (r: string | null) => !r ? "" : r === "pass" ? "bg-emerald-500/10 border-emerald-500/30" : r === "fail" ? "bg-red-500/10 border-red-500/30" : "bg-amber-500/10 border-amber-500/30";
   return (
     <div className="space-y-4">
       {/* Summary */}
       {data.summary && (
         <div className="premium-surface rounded-xl p-4">
-          <p className="eyebrow mb-2">Summary</p>
-          <div className="grid sm:grid-cols-2 gap-2 text-xs">
-            {data.summary.from && <div><span className="text-muted-foreground">From:</span> <span className="text-foreground break-all">{data.summary.from}</span></div>}
-            {data.summary.to && <div><span className="text-muted-foreground">To:</span> <span className="text-foreground break-all">{data.summary.to}</span></div>}
-            {data.summary.subject && <div className="sm:col-span-2"><span className="text-muted-foreground">Subject:</span> <span className="text-foreground">{data.summary.subject}</span></div>}
-            {data.summary.date && <div><span className="text-muted-foreground">Date:</span> <span className="text-foreground">{data.summary.date}</span></div>}
-            {data.summary.total_delay_str && <div><span className="text-muted-foreground">Transit time:</span> <span className="text-foreground">{data.summary.total_delay_str}</span></div>}
-          </div>
+          <p className="eyebrow mb-2">Message summary</p>
+          <table className="w-full text-xs">
+            <tbody>
+              {[
+                ["From", data.summary.from],
+                ["To", data.summary.to],
+                ["Subject", data.summary.subject],
+                ["Date", data.summary.date],
+                ["Message-ID", data.summary.message_id],
+                ["Transit time", data.summary.total_delay_str],
+                ["Hops", data.summary.total_hops],
+              ].filter(([,v]) => v).map(([k, v]) => (
+                <tr key={k as string} className="border-b border-white/5 last:border-0">
+                  <td className="py-1.5 pr-4 text-muted-foreground whitespace-nowrap align-top w-28">{k}</td>
+                  <td className="py-1.5 text-foreground break-all">{String(v)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Auth */}
+      {/* Authentication */}
       {data.auth && (
         <div className="premium-surface rounded-xl p-4">
-          <p className="eyebrow mb-2">Authentication</p>
-          <div className="flex gap-4 text-xs flex-wrap">
-            <span>SPF: <strong className={authColor(data.auth.spf?.result)}>{data.auth.spf?.result || "—"}</strong></span>
-            <span>DKIM: <strong className={authColor(data.auth.dkim?.result)}>{data.auth.dkim?.result || "—"}</strong></span>
-            <span>DMARC: <strong className={authColor(data.auth.dmarc?.result)}>{data.auth.dmarc?.result || "—"}</strong></span>
-            {data.auth.arc && <span>ARC: <strong className="text-foreground">{data.auth.arc.count} header(s)</strong></span>}
+          <p className="eyebrow mb-3">Authentication results</p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+            {[
+              { label: "SPF", data: data.auth.spf },
+              { label: "DKIM", data: data.auth.dkim },
+              { label: "DMARC", data: data.auth.dmarc },
+              { label: "CompAuth", data: data.auth.compauth },
+            ].map((a) => (
+              <div key={a.label} className={`rounded-lg border p-3 ${authBg(a.data?.result)}`}>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{a.label}</p>
+                <p className={`font-display font-bold text-sm ${authColor(a.data?.result)}`}>{a.data?.result || "—"}</p>
+              </div>
+            ))}
           </div>
+          {data.auth.spf?.raw && (
+            <details className="text-[11px] mt-2">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Raw Authentication-Results</summary>
+              <pre className="mt-1 font-mono text-[10px] text-foreground/70 whitespace-pre-wrap break-all bg-white/[0.02] rounded p-2 border border-white/5">{data.auth.spf.raw}</pre>
+            </details>
+          )}
         </div>
       )}
 
       {/* Hops */}
       {Array.isArray(data.hops) && data.hops.length > 0 && (
-        <div>
-          <p className="eyebrow mb-2">Message path ({data.hops.length} hops)</p>
-          <div className="space-y-1">
-            {data.hops.map((h: any, i: number) => (
-              <div key={i} className="premium-surface rounded-lg p-3">
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-display font-bold text-muted-foreground w-5">{h.index}</span>
-                  <span className="font-mono text-foreground/90 flex-1 truncate">{h.by || h.from || "unknown"}</span>
-                  {h.delay_str && (
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${h.delay_ms > 30000 ? "bg-red-500/15 text-red-300" : h.delay_ms > 5000 ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-300"}`}>
-                      +{h.delay_str}
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-3 mt-1 text-[10px] text-muted-foreground ml-7 flex-wrap">
-                  {h.from && <span>from: {h.from}</span>}
-                  {h.ip && <span>ip: {h.ip}</span>}
-                  {h.protocol && <span>with: {h.protocol}</span>}
-                  {h.date_str && <span>{h.date_str}</span>}
-                </div>
-              </div>
-            ))}
+        <div className="premium-surface rounded-xl p-4">
+          <p className="eyebrow mb-3">Message path ({data.hops.length} hops)</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-muted-foreground text-left border-b border-white/10">
+                  <th className="pb-2 pr-2 w-6">#</th>
+                  <th className="pb-2 pr-2">From</th>
+                  <th className="pb-2 pr-2">By</th>
+                  <th className="pb-2 pr-2">IP</th>
+                  <th className="pb-2 pr-2">Protocol</th>
+                  <th className="pb-2 pr-2">Time</th>
+                  <th className="pb-2">Delay</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.hops.map((h: any, i: number) => (
+                  <tr key={i} className="border-b border-white/5 last:border-0">
+                    <td className="py-2 pr-2 font-bold text-muted-foreground">{h.index}</td>
+                    <td className="py-2 pr-2 font-mono truncate max-w-[180px]">{h.from || "—"}</td>
+                    <td className="py-2 pr-2 font-mono truncate max-w-[180px]">{h.by || "—"}</td>
+                    <td className="py-2 pr-2 font-mono">{h.ip || "—"}</td>
+                    <td className="py-2 pr-2">{h.protocol || "—"}</td>
+                    <td className="py-2 pr-2 text-muted-foreground whitespace-nowrap">{h.timestamp ? new Date(h.timestamp).toLocaleTimeString() : "—"}</td>
+                    <td className="py-2">
+                      {h.delay_str ? (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${h.delay_ms > 30000 ? "bg-red-500/15 text-red-300" : h.delay_ms > 5000 ? "bg-amber-500/15 text-amber-300" : h.delay_ms < 0 ? "bg-blue-500/15 text-blue-300" : "bg-emerald-500/15 text-emerald-300"}`}>
+                          {h.delay_str}
+                        </span>
+                      ) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+          <details className="text-[11px] mt-3">
+            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Raw Received headers</summary>
+            <div className="mt-2 space-y-2">
+              {data.hops.map((h: any, i: number) => (
+                <pre key={i} className="font-mono text-[10px] text-foreground/60 whitespace-pre-wrap break-all bg-white/[0.02] rounded p-2 border border-white/5">{h.raw}</pre>
+              ))}
+            </div>
+          </details>
+        </div>
+      )}
+
+      {/* Key headers */}
+      {data.key_headers && Object.keys(data.key_headers).length > 0 && (
+        <div className="premium-surface rounded-xl p-4">
+          <p className="eyebrow mb-2">Key headers</p>
+          <table className="w-full text-[11px]">
+            <tbody>
+              {Object.entries(data.key_headers).map(([k, v]) => (
+                <tr key={k} className="border-b border-white/5 last:border-0">
+                  <td className="py-1.5 pr-3 text-orange-300 font-mono whitespace-nowrap align-top">{k}</td>
+                  <td className="py-1.5 text-foreground/80 break-all font-mono">{String(v)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
       {/* Anti-spam */}
       {data.antispam && (
         <div className="premium-surface rounded-xl p-4">
-          <p className="eyebrow mb-2">Anti-spam verdicts</p>
-          <div className="space-y-1 font-mono text-[11px]">
+          <p className="eyebrow mb-2">Anti-spam analysis</p>
+          {(data.antispam._scl != null || data.antispam._bcl != null) && (
+            <div className="flex gap-4 mb-3">
+              {data.antispam._scl != null && (
+                <div className={`rounded-lg border p-3 ${data.antispam._scl >= 5 ? "bg-red-500/10 border-red-500/30" : data.antispam._scl >= 3 ? "bg-amber-500/10 border-amber-500/30" : "bg-emerald-500/10 border-emerald-500/30"}`}>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">SCL</p>
+                  <p className={`font-display font-bold text-lg ${data.antispam._scl >= 5 ? "text-red-300" : data.antispam._scl >= 3 ? "text-amber-300" : "text-emerald-300"}`}>{data.antispam._scl}</p>
+                  <p className="text-[9px] text-muted-foreground">{data.antispam._scl === 0 ? "Not spam" : data.antispam._scl <= 1 ? "Low risk" : data.antispam._scl <= 4 ? "Medium" : "High / Spam"}</p>
+                </div>
+              )}
+              {data.antispam._bcl != null && (
+                <div className={`rounded-lg border p-3 ${data.antispam._bcl >= 5 ? "bg-amber-500/10 border-amber-500/30" : "bg-emerald-500/10 border-emerald-500/30"}`}>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">BCL</p>
+                  <p className={`font-display font-bold text-lg ${data.antispam._bcl >= 5 ? "text-amber-300" : "text-emerald-300"}`}>{data.antispam._bcl}</p>
+                  <p className="text-[9px] text-muted-foreground">{data.antispam._bcl === 0 ? "Not bulk" : data.antispam._bcl <= 3 ? "Low bulk" : "Bulk sender"}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="space-y-1.5 font-mono text-[10px]">
             {Object.entries(data.antispam).filter(([k]) => !k.startsWith("_")).map(([k, v]) => (
-              <div key={k} className="break-all">
-                <span className="text-orange-300">{k}</span>
-                <span className="text-muted-foreground">: </span>
-                <span className="text-foreground/80">{String(v)}</span>
+              <div key={k} className="break-all bg-white/[0.02] rounded p-2 border border-white/5">
+                <span className="text-orange-300 font-bold">{k}</span>
+                <br />
+                <span className="text-foreground/70">{String(v)}</span>
               </div>
             ))}
           </div>
