@@ -32,9 +32,8 @@ export function WorldMap({ resolvers, loading }: Props) {
     <div
       className="relative w-full rounded-xl overflow-hidden border border-white/[0.06]"
       style={{
-        height: "calc(100vh - 520px)",
-        minHeight: "300px",
-        background: "#080a12 url(/world.svg) center center / 100% 100% no-repeat",
+        aspectRatio: "2 / 1",
+        background: "#080a12 url(/world.svg) 0 0 / 100% 100% no-repeat",
         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03), 0 16px 48px -12px rgba(0,0,0,0.5)",
       }}
     >
