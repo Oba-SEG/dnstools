@@ -40,7 +40,7 @@ export function WorldMap({ resolvers, loading }: Props) {
       container: containerRef.current,
       style: "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json",
       center: [0, 15],
-      zoom: 0.85,
+      zoom: 0.7,
       attributionControl: false,
       renderWorldCopies: true,
       interactive: false,
@@ -88,7 +88,7 @@ export function WorldMap({ resolvers, loading }: Props) {
   }, [resolvers, ready]);
 
   return (
-    <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.06]" style={{ height: "480px", background: "#0a0c14", boxShadow: "0 0 0 1px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04), 0 20px 60px -20px rgba(0,0,0,0.6)" }}>
+    <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.06]" style={{ height: "calc(100vh - 520px)", minHeight: "300px", background: "#0a0c14", boxShadow: "0 0 0 1px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04), 0 20px 60px -20px rgba(0,0,0,0.6)" }}>
       <div ref={containerRef} className="absolute inset-0" />
 
       {loading && (
