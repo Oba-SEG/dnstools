@@ -242,7 +242,7 @@ export default function Home() {
         )}
 
         {(submitted || tab === "mha") && data && (
-          <div className="max-w-5xl mx-auto">
+          <div className="w-full">
             {tab === "lookup" && <LookupView data={data} />}
             {tab === "propagation" && <PropagationView data={data} type={propType} setType={setPropType} />}
             {tab === "email" && <EmailView data={data} />}
