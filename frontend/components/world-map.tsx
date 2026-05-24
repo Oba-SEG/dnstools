@@ -34,7 +34,7 @@ export function WorldMap({ resolvers, loading }: Props) {
       style={{
         height: "calc(100vh - 520px)",
         minHeight: "300px",
-        background: "#080a12 url(/world.svg) center center / contain no-repeat",
+        background: "#080a12 url(/world.svg) center center / 100% 100% no-repeat",
         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03), 0 16px 48px -12px rgba(0,0,0,0.5)",
       }}
     >

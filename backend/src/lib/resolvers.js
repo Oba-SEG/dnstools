@@ -6,12 +6,12 @@
 // understand what's being asked.
 
 const RESOLVERS = [
-  // North America — spread out so markers don't overlap
+  // North America
   { id: 'cf-na', name: 'Cloudflare', ip: '1.1.1.1',         country: 'US', city: 'San Francisco',  lat: 37.77,  lon: -122.42, tag: 'global-anycast' },
-  { id: 'g8',    name: 'Google',     ip: '8.8.8.8',         country: 'US', city: 'Mountain View',  lat: 35.50,  lon: -118.00, tag: 'global-anycast' },
-  { id: 'g844', name: 'Google',      ip: '8.8.4.4',         country: 'US', city: 'Mountain View',  lat: 33.80,  lon: -114.00, tag: 'global-anycast' },
-  { id: 'q9',    name: 'Quad9',      ip: '9.9.9.9',         country: 'US', city: 'Berkeley',       lat: 40.00,  lon: -105.00, tag: 'global-anycast' },
-  { id: 'odns',  name: 'OpenDNS',    ip: '208.67.222.222',  country: 'US', city: 'San Francisco',  lat: 34.00,  lon: -97.00,  tag: 'global-anycast' },
+  { id: 'g8',    name: 'Google',     ip: '8.8.8.8',         country: 'US', city: 'Mountain View',  lat: 37.39,  lon: -122.08, tag: 'global-anycast' },
+  { id: 'g844', name: 'Google',      ip: '8.8.4.4',         country: 'US', city: 'Mountain View',  lat: 37.39,  lon: -122.08, tag: 'global-anycast' },
+  { id: 'q9',    name: 'Quad9',      ip: '9.9.9.9',         country: 'US', city: 'Berkeley',       lat: 37.87,  lon: -122.27, tag: 'global-anycast' },
+  { id: 'odns',  name: 'OpenDNS',    ip: '208.67.222.222',  country: 'US', city: 'San Francisco',  lat: 37.77,  lon: -122.42, tag: 'global-anycast' },
   { id: 'csv',   name: 'Verisign',   ip: '64.6.64.6',       country: 'US', city: 'Reston',         lat: 38.96,  lon: -77.34,  tag: 'global-anycast' },
   // Europe
   { id: 'cf-eu', name: 'Cloudflare', ip: '1.0.0.1',         country: 'NL', city: 'Amsterdam',      lat: 52.37,  lon: 4.90,    tag: 'global-anycast' },
