@@ -39,8 +39,8 @@ export function WorldMap({ resolvers, loading }: Props) {
     const map = new MapLibreGL.Map({
       container: containerRef.current,
       style: "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json",
-      center: [20, 20],
-      zoom: 1.35,
+      center: [10, 20],
+      zoom: 1.1,
       attributionControl: false,
       renderWorldCopies: false,
       interactive: false,
