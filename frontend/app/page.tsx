@@ -342,7 +342,7 @@ function PropagationView({ data, type, setType }: { data: any; type: string; set
         <WorldMap resolvers={data.resolvers} />
 
         {/* Results right - compact scrollable list */}
-        <div className="space-y-0.5 max-h-[260px] overflow-y-auto">
+        <div className="space-y-0.5 max-h-[480px] overflow-y-auto">
           {data.resolvers.map((r: any) => (
             <div key={r.resolver.id} className="flex items-center gap-1.5 px-2 py-1.5 rounded-md hover:bg-white/[0.03] transition-colors">
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${!r.ok ? 'bg-red-400' : r.consensus ? 'bg-green-400' : 'bg-yellow-400'}`} />

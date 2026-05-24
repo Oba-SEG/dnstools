@@ -40,7 +40,7 @@ export function WorldMap({ resolvers, loading }: Props) {
       container: containerRef.current,
       style: "https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json",
       center: [20, 20],
-      zoom: 0.9,
+      zoom: 1.35,
       attributionControl: false,
       renderWorldCopies: false,
       interactive: false,
@@ -75,8 +75,8 @@ export function WorldMap({ resolvers, loading }: Props) {
       const color = !r.ok ? "#f87171" : r.consensus ? "#4ade80" : "#facc15";
 
       const el = document.createElement("div");
-      el.style.cssText = `width:14px;height:14px;position:relative;`;
-      el.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="7" fill="${color}" opacity="0.15"/><circle cx="7" cy="7" r="4" fill="${color}" opacity="0.4"/><circle cx="7" cy="7" r="2" fill="${color}"/></svg>`;
+      el.style.cssText = `width:22px;height:22px;position:relative;`;
+      el.innerHTML = `<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="${color}" opacity="0.18"/><circle cx="11" cy="11" r="6" fill="${color}" opacity="0.45"/><circle cx="11" cy="11" r="3" fill="${color}"/></svg>`;
       el.title = `${r.resolver.name} — ${r.resolver.city}, ${r.resolver.country}\n${r.resolver.ip}\n${r.ok ? (r.records?.join(", ") || "no records") : r.error}`;
 
       const marker = new MapLibreGL.Marker({ element: el, anchor: "center" })
@@ -88,7 +88,7 @@ export function WorldMap({ resolvers, loading }: Props) {
   }, [resolvers, ready]);
 
   return (
-    <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.06]" style={{ height: "260px", background: "#0a0c14", boxShadow: "0 0 0 1px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04), 0 20px 60px -20px rgba(0,0,0,0.6)" }}>
+    <div className="relative w-full rounded-xl overflow-hidden border border-white/[0.06]" style={{ height: "480px", background: "#0a0c14", boxShadow: "0 0 0 1px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04), 0 20px 60px -20px rgba(0,0,0,0.6)" }}>
       <div ref={containerRef} className="absolute inset-0" />
 
       {loading && (
