@@ -47,16 +47,26 @@ export function WorldMap({ resolvers, loading }: Props) {
             key={r.resolver.id}
             className="absolute -translate-x-1/2 -translate-y-1/2 group"
             style={{ left: `${x}%`, top: `${y}%` }}
-            title={`${r.resolver.name} · ${r.resolver.city}, ${r.resolver.country}\n${r.resolver.ip}\n${r.ok ? r.records?.join(", ") || "—" : r.error}`}
           >
             <span
               className="absolute inset-0 rounded-full animate-ping"
               style={{ width: 20, height: 20, marginLeft: -10, marginTop: -10, background: color, opacity: 0.15 }}
             />
             <span
-              className="block rounded-full"
+              className="block rounded-full cursor-pointer"
               style={{ width: 10, height: 10, background: color, boxShadow: `0 0 6px ${color}` }}
             />
+            {/* Tooltip */}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-20 pointer-events-none">
+              <div className="bg-black/90 border border-white/10 rounded-lg px-3 py-2 text-[10px] whitespace-nowrap shadow-xl">
+                <p className="font-bold text-white">{r.resolver.name} <span className="text-muted-foreground font-normal">· {r.resolver.city}, {r.resolver.country}</span></p>
+                <p className="text-muted-foreground font-mono mt-0.5">{r.resolver.ip}</p>
+                <p className="mt-0.5" style={{ color }}>
+                  {r.ok ? (r.records?.join(", ") || "no records") : r.error}
+                </p>
+                <p className="text-muted-foreground mt-0.5">{r.latency_ms}ms</p>
+              </div>
+            </div>
           </div>
         );
       })}
