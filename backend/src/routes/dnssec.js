@@ -10,6 +10,7 @@ const express = require('express');
 const dns = require('node:dns/promises');
 const { normaliseDomain } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -53,7 +54,7 @@ async function checkDnssec(domain) {
 
 const cached = memoizeAsync(checkDnssec, { ttl: 5 * 60_000, keyFn: (d) => d });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const target = normaliseDomain(req.query.domain || req.query.q);
   if (!target) {
     return res.status(400).json({ error: 'Provide a valid domain via ?domain=example.com' });
@@ -65,6 +66,6 @@ router.get('/', async (req, res) => {
   } catch (err) {
     res.status(422).json({ error: 'DNSSEC check failed', detail: err.code || err.message });
   }
-});
+}));
 
 module.exports = router;

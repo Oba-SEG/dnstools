@@ -5,6 +5,7 @@ const dns = require('node:dns/promises');
 const net = require('node:net');
 const { classifyIp } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ async function reverseLookup(ip) {
 
 const cached = memoizeAsync(reverseLookup, { ttl: 60_000, keyFn: (ip) => ip });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const ip = String(req.query.ip || req.query.q || '').trim();
   if (!net.isIP(ip)) {
     return res.status(400).json({ error: 'Provide a valid IPv4 or IPv6 address via ?ip=...' });
@@ -36,6 +37,6 @@ router.get('/', async (req, res) => {
       detail: err.message,
     });
   }
-});
+}));
 
 module.exports = router;

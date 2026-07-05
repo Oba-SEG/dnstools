@@ -31,7 +31,7 @@ app.use(helmet({
 }));
 
 // CORS: allow the frontend origin and a small list of dev origins.
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3001').split(',').map(s => s.trim()).filter(Boolean);
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3001,http://localhost:3002,http://localhost:3003').split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({
   origin: (origin, cb) => {
     // Allow same-origin / curl / direct API
@@ -78,6 +78,16 @@ const heavyLimiter = rateLimit({
   message: { error: 'Limit exceeded for this endpoint; try again in a minute.' },
 });
 
+// Speed test needs many requests per run (10 pings + 6 downloads + 5 uploads + 1 save = 22).
+// Allow ~5 complete tests per minute.
+const speedtestLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Speed test rate limit exceeded; try again in a minute.' },
+});
+
 // --- Routes ---
 app.get('/health', (req, res) => res.json({ ok: true, service: 'nexus-dns', uptime_s: Math.round(process.uptime()) }));
 
@@ -97,6 +107,8 @@ app.use('/api/probe', heavyLimiter, require('./routes/probe'));
 app.use('/api/traceroute', heavyLimiter, require('./routes/traceroute'));
 app.use('/api/geoip', lookupLimiter, require('./routes/geoip'));
 app.use('/api/mha', lookupLimiter, express.json({ limit: '256kb' }), require('./routes/mha'));
+// T3 — speed test diagnostics (higher limit: ~22 requests per test run)
+app.use('/api/speedtest', speedtestLimiter, require('./routes/speedtest'));
 
 // 404 for anything else
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));

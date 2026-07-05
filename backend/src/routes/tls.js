@@ -5,6 +5,7 @@ const tls = require('node:tls');
 const dns = require('node:dns/promises');
 const { normaliseDomain, classifyIp } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ async function inspectTls(domain, port) {
   if (addrs.length === 0) {
     throw Object.assign(new Error('Could not resolve target'), { code: 'DNS_FAIL' });
   }
+  const resolvedIp = addrs[0].address;
   for (const a of addrs) {
     const c = classifyIp(a.address);
     if (!c.valid) {
@@ -26,7 +28,7 @@ async function inspectTls(domain, port) {
 
   return new Promise((resolve, reject) => {
     const socket = tls.connect({
-      host: domain,
+      host: resolvedIp,
       port,
       servername: domain,
       // Don't reject on cert problems — we want to surface them to the user.
@@ -105,7 +107,7 @@ async function inspectTls(domain, port) {
 
 const cachedInspect = memoizeAsync(inspectTls, { ttl: 5 * 60_000, keyFn: (d, p) => `${d}::${p}` });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const target = normaliseDomain(req.query.domain || req.query.q);
   const port = parseInt(req.query.port || '443', 10);
   if (!target) {
@@ -117,7 +119,7 @@ router.get('/', async (req, res) => {
   try {
     const started = Date.now();
     const result = await cachedInspect(target, port);
-    res.json({ ...result, elapsed_ms: Date.now() - started });
+    res.json({ ...result, elapsed_ms: Date.now() - started     });
   } catch (err) {
     res.status(422).json({
       host: target,
@@ -126,6 +128,6 @@ router.get('/', async (req, res) => {
       detail: err.message,
     });
   }
-});
+}));
 
 module.exports = router;

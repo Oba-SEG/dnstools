@@ -5,6 +5,7 @@ const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { normaliseDomain, classifyIp } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const execFileAsync = promisify(execFile);
 const router = express.Router();
@@ -50,7 +51,7 @@ async function lookupWhois(target) {
 
 const cached = memoizeAsync(lookupWhois, { ttl: 60 * 60_000, keyFn: (d) => d });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const input = (req.query.domain || req.query.q || '').trim();
   // Accept domain or IP
   const ipCheck = classifyIp(input);
@@ -65,6 +66,6 @@ router.get('/', async (req, res) => {
   } catch (err) {
     res.status(422).json({ error: 'WHOIS lookup failed', detail: err.code || err.message });
   }
-});
+}));
 
 module.exports = router;

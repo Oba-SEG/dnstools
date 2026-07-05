@@ -9,6 +9,7 @@ const net = require('node:net');
 const dns = require('node:dns/promises');
 const { normaliseDomain, classifyIp } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -77,7 +78,7 @@ async function checkPorts(target, ports) {
 
 const cached = memoizeAsync(checkPorts, { ttl: 30_000, keyFn: (t, ports) => `${t}::${ports.join(',')}` });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const target = normaliseDomain(req.query.host || req.query.q) || (net.isIP(String(req.query.host || '').trim()) ? String(req.query.host).trim() : null);
   if (!target) {
     return res.status(400).json({ error: 'Provide a valid host via ?host=example.com' });
@@ -94,6 +95,6 @@ router.get('/', async (req, res) => {
   } catch (err) {
     res.status(err.code === 'PRIVATE_TARGET' ? 400 : 502).json({ error: err.code || 'portcheck-failed', detail: err.message });
   }
-});
+}));
 
 module.exports = router;

@@ -5,6 +5,7 @@ const dns = require('node:dns/promises');
 const { normaliseDomain } = require('../lib/validate');
 const { RESOLVERS } = require('../lib/resolvers');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -37,53 +38,57 @@ const cachedQuery = memoizeAsync(queryResolver, {
   keyFn: (d, t, r) => `${d}::${t}::${r}`,
 });
 
-router.get('/', async (req, res) => {
-  const target = normaliseDomain(req.query.domain || req.query.q);
-  if (!target) {
-    return res.status(400).json({ error: 'Provide a valid domain via ?domain=example.com' });
-  }
-  const type = String(req.query.type || 'A').toUpperCase();
-  if (!SUPPORTED_TYPES.includes(type)) {
-    return res.status(400).json({ error: `Unsupported type. Allowed: ${SUPPORTED_TYPES.join(', ')}` });
-  }
+router.get('/', asyncHandler(async (req, res, next) => {
+  try {
+    const target = normaliseDomain(req.query.domain || req.query.q);
+    if (!target) {
+      return res.status(400).json({ error: 'Provide a valid domain via ?domain=example.com' });
+    }
+    const type = String(req.query.type || 'A').toUpperCase();
+    if (!SUPPORTED_TYPES.includes(type)) {
+      return res.status(400).json({ error: `Unsupported type. Allowed: ${SUPPORTED_TYPES.join(', ')}` });
+    }
 
-  const started = Date.now();
-  // Fire all resolver queries in parallel. Each has its own per-query
-  // timeout (4s), so the whole call returns in ~4s worst case.
-  const results = await Promise.all(
-    RESOLVERS.map(async (r) => {
-      const result = await cachedQuery(target, type, r.ip);
-      return { resolver: r, ...result };
-    })
-  );
+    const started = Date.now();
+    // Fire all resolver queries in parallel. Each has its own per-query
+    // timeout (4s), so the whole call returns in ~4s worst case.
+    const results = await Promise.all(
+      RESOLVERS.map(async (r) => {
+        const result = await cachedQuery(target, type, r.ip);
+        return { resolver: r, ...result };
+      })
+    );
 
-  // Determine consensus value(s) for visualisation (which resolvers
-  // agree, which disagree).
-  const fingerprints = new Map();
-  for (const r of results) {
-    const fp = r.ok ? JSON.stringify([...new Set(r.records)].sort()) : `error:${r.error}`;
-    fingerprints.set(fp, (fingerprints.get(fp) || 0) + 1);
-  }
-  let dominant = null;
-  for (const [fp, count] of fingerprints) {
-    if (!dominant || count > dominant.count) dominant = { fingerprint: fp, count };
-  }
-  for (const r of results) {
-    const fp = r.ok ? JSON.stringify([...new Set(r.records)].sort()) : `error:${r.error}`;
-    r.consensus = fp === dominant?.fingerprint;
-  }
+    // Determine consensus value(s) for visualisation (which resolvers
+    // agree, which disagree).
+    const fingerprints = new Map();
+    for (const r of results) {
+      const fp = r.ok ? JSON.stringify([...new Set(r.records)].sort()) : `error:${r.error}`;
+      fingerprints.set(fp, (fingerprints.get(fp) || 0) + 1);
+    }
+    let dominant = null;
+    for (const [fp, count] of fingerprints) {
+      if (!dominant || count > dominant.count) dominant = { fingerprint: fp, count };
+    }
+    for (const r of results) {
+      const fp = r.ok ? JSON.stringify([...new Set(r.records)].sort()) : `error:${r.error}`;
+      r.consensus = fp === dominant?.fingerprint;
+    }
 
-  res.json({
-    domain: target,
-    type,
-    elapsed_ms: Date.now() - started,
-    resolvers: results,
-    consensus: {
-      total: results.length,
-      agreeing: results.filter(r => r.consensus).length,
-      ok: results.filter(r => r.ok).length,
-    },
-  });
-});
+    res.json({
+      domain: target,
+      type,
+      elapsed_ms: Date.now() - started,
+      resolvers: results,
+      consensus: {
+        total: results.length,
+        agreeing: results.filter(r => r.consensus).length,
+        ok: results.filter(r => r.ok).length,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}));
 
 module.exports = router;

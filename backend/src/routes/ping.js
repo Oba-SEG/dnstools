@@ -10,6 +10,7 @@ const net = require('node:net');
 const dns = require('node:dns/promises');
 const { normaliseDomain, classifyIp } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -65,7 +66,7 @@ async function pingTarget(target, port) {
 
 const cached = memoizeAsync(pingTarget, { ttl: 30_000, keyFn: (t, p) => `${t}::${p}` });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const target = normaliseDomain(req.query.host || req.query.q) || (net.isIP(String(req.query.host || '').trim()) ? String(req.query.host).trim() : null);
   const port = parseInt(req.query.port || '443', 10);
   if (!target) {
@@ -81,6 +82,6 @@ router.get('/', async (req, res) => {
   } catch (err) {
     res.status(err.code === 'PRIVATE_TARGET' ? 400 : 502).json({ error: err.code || 'ping-failed', detail: err.message });
   }
-});
+}));
 
 module.exports = router;

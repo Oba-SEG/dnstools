@@ -4,6 +4,7 @@ const express = require('express');
 const dns = require('node:dns/promises');
 const { normaliseDomain } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -153,7 +154,7 @@ async function inspectEmail(domain) {
 
 const cachedInspect = memoizeAsync(inspectEmail, { ttl: 60_000, keyFn: (d) => d });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const target = normaliseDomain(req.query.domain || req.query.q);
   if (!target) {
     return res.status(400).json({ error: 'Provide a valid domain via ?domain=example.com' });
@@ -165,6 +166,6 @@ router.get('/', async (req, res) => {
   } catch (err) {
     res.status(422).json({ error: 'Email inspection failed', detail: err.code || err.message });
   }
-});
+}));
 
 module.exports = router;

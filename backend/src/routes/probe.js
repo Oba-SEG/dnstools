@@ -13,6 +13,7 @@ const https = require('node:https');
 const { URL } = require('node:url');
 const { normaliseDomain, classifyIp } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -36,21 +37,22 @@ async function timedRequest(rawUrl) {
   }
   const port = url.port ? parseInt(url.port, 10) : (isHttps ? 443 : 80);
 
-  // SSRF guard
-  await resolveAndGuard(url.hostname);
-
+  // SSRF guard — resolve and validate IP
   const dnsStart = process.hrtime.bigint();
-  const lookupResult = await dns.lookup(url.hostname, { family: 4 });
+  const resolvedIp = await resolveAndGuard(url.hostname);
+  const lookupResult = { address: resolvedIp };
   const dnsMs = Number(process.hrtime.bigint() - dnsStart) / 1_000_000;
 
+  // TOCTOU fix: connect to resolved IP, set Host header to original hostname
   return new Promise((resolve, reject) => {
     const lib = isHttps ? https : http;
     const req = lib.request({
       method: 'GET',
-      host: url.hostname,
+      hostname: resolvedIp,
       port,
       path: url.pathname + url.search,
       headers: {
+        'Host': url.hostname,
         'User-Agent': 'Mozilla/5.0 (compatible; NexusDNS/1.0; +https://dns.segbytes.co.za)',
         'Accept': '*/*',
       },
@@ -114,7 +116,7 @@ async function probe(rawUrl) {
 
 const cached = memoizeAsync(probe, { ttl: 30_000, keyFn: (u) => u });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   let target = String(req.query.url || req.query.q || req.query.host || '').trim();
   if (!target) return res.status(400).json({ error: 'Provide ?url=https://example.com or ?host=example.com' });
   // Allow bare domain: prefer https
@@ -130,6 +132,6 @@ router.get('/', async (req, res) => {
   } catch (err) {
     res.status(err.code === 'PRIVATE_TARGET' ? 400 : 502).json({ error: err.code || 'probe-failed', detail: err.message });
   }
-});
+}));
 
 module.exports = router;

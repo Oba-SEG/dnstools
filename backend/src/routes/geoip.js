@@ -11,6 +11,7 @@ const dns = require('node:dns/promises');
 const geoip = require('geoip-lite');
 const { normaliseDomain, classifyIp } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -42,7 +43,7 @@ async function lookup(target) {
 
 const cached = memoizeAsync(lookup, { ttl: 60 * 60_000, keyFn: (t) => t });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const target = String(req.query.q || req.query.host || req.query.ip || '').trim();
   if (!target) return res.status(400).json({ error: 'Provide ?q=<ip-or-domain>' });
   let cleanTarget = target;
@@ -57,6 +58,6 @@ router.get('/', async (req, res) => {
   } catch (err) {
     res.status(err.code === 'PRIVATE_TARGET' ? 400 : 502).json({ error: err.code || 'geoip-failed', detail: err.message });
   }
-});
+}));
 
 module.exports = router;

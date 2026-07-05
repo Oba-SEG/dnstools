@@ -7,6 +7,7 @@ const express = require('express');
 const dns = require('node:dns/promises');
 const { normaliseDomain, classifyIp } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ async function safelyFetch(domain) {
   if (addrs.length === 0) {
     throw Object.assign(new Error('Could not resolve target'), { code: 'DNS_FAIL' });
   }
+  const resolvedIp = addrs[0].address;
   for (const a of addrs) {
     const c = classifyIp(a.address);
     if (!c.valid) {
@@ -26,26 +28,45 @@ async function safelyFetch(domain) {
     }
   }
 
+  // TOCTOU fix: connect to resolved IP, set Host header to domain.
+  // Native fetch() resolves DNS internally and can't be overridden, so we
+  // use http/https modules which allow passing a resolved IP as hostname
+  // while keeping the correct Host header for virtual hosting.
+  const http = require('node:http');
+  const https = require('node:https');
+
+  function doFetch(protocol, ip) {
+    return new Promise((resolve, reject) => {
+      const lib = protocol === 'https:' ? https : http;
+      const req = lib.get({
+        hostname: ip,
+        port: protocol === 'https:' ? 443 : 80,
+        path: '/',
+        headers: {
+          'Host': domain,
+          'User-Agent': 'Mozilla/5.0 (compatible; NexusDNS/1.0; +https://dns.segbytes.co.za)',
+        },
+        rejectUnauthorized: false,
+        timeout: FETCH_TIMEOUT_MS,
+      }, (res) => {
+        // Consume response body to free socket
+        res.resume();
+        resolve(res);
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    });
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    // Prefer https, fall back to http if needed.
     let response;
     try {
-      response = await fetch(`https://${domain}`, {
-        method: 'GET',
-        redirect: 'manual',
-        signal: controller.signal,
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NexusDNS/1.0; +https://dns.segbytes.co.za)' },
-      });
+      response = await doFetch('https:', resolvedIp);
     } catch {
-      response = await fetch(`http://${domain}`, {
-        method: 'GET',
-        redirect: 'manual',
-        signal: controller.signal,
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NexusDNS/1.0; +https://dns.segbytes.co.za)' },
-      });
+      response = await doFetch('http:', resolvedIp);
     }
     return response;
   } finally {
@@ -68,7 +89,14 @@ const SECURITY_HEADERS = [
 async function analyseHeaders(domain) {
   const res = await safelyFetch(domain);
   const headersFound = {};
-  res.headers.forEach((value, key) => { headersFound[key.toLowerCase()] = value; });
+  // node:http headers are plain objects; node:fetch Headers have .forEach().
+  if (typeof res.headers.forEach === 'function') {
+    res.headers.forEach((value, key) => { headersFound[key.toLowerCase()] = value; });
+  } else {
+    for (const [key, value] of Object.entries(res.headers)) {
+      headersFound[key.toLowerCase()] = value;
+    }
+  }
 
   const checks = SECURITY_HEADERS.map(h => ({
     name: h.label,
@@ -101,7 +129,7 @@ async function analyseHeaders(domain) {
 
 const cached = memoizeAsync(analyseHeaders, { ttl: 5 * 60_000, keyFn: (d) => d });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const target = normaliseDomain(req.query.domain || req.query.q);
   if (!target) {
     return res.status(400).json({ error: 'Provide a valid domain via ?domain=example.com' });
@@ -113,6 +141,6 @@ router.get('/', async (req, res) => {
   } catch (err) {
     res.status(422).json({ error: 'Header analysis failed', detail: err.code || err.message });
   }
-});
+}));
 
 module.exports = router;

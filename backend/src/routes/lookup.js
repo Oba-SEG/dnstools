@@ -4,6 +4,7 @@ const express = require('express');
 const dns = require('node:dns/promises');
 const { normaliseDomain, isPlausibleDomain } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -35,7 +36,7 @@ async function resolveType(domain, type) {
 
 const cachedResolve = memoizeAsync(resolveType, { ttl: 30_000, keyFn: (d, t) => `${d}::${t}` });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const target = normaliseDomain(req.query.domain || req.query.q);
   if (!target) {
     return res.status(400).json({ error: 'Provide a valid domain via ?domain=example.com' });
@@ -52,6 +53,6 @@ router.get('/', async (req, res) => {
     elapsed_ms: Date.now() - started,
     results,
   });
-});
+}));
 
 module.exports = router;

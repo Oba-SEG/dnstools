@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Search, Globe, Mail, ShieldCheck, Server, Map, FileSearch, AlertTriangle,
-  CheckCircle2, XCircle, Loader2, Lock, ChevronRight, Network, Radio, Clock,
+  CheckCircle2, XCircle, Loader2, Lock, ChevronRight, Network, Radio, Clock, LinkIcon,
 } from "lucide-react";
 import { WorldMap } from "@/components/world-map";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 
-type TabKey = "lookup" | "propagation" | "email" | "tls" | "whois" | "headers" | "blacklist" | "dnssec" | "ping" | "portcheck" | "probe" | "traceroute" | "geoip" | "mha";
+type TabKey = "lookup" | "propagation" | "email" | "tls" | "whois" | "headers" | "blacklist" | "dnssec" | "ping" | "portcheck" | "probe" | "traceroute" | "geoip" | "mha" | "speedtest";
 
 const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
   { key: "lookup",      label: "DNS records",   icon: Globe,       desc: "All record types (A, AAAA, MX, NS, TXT, SOA, SRV, CAA)" },
@@ -26,6 +26,7 @@ const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
   { key: "traceroute",  label: "Traceroute",    icon: Network,     desc: "Hop-by-hop network path (TCP mode)" },
   { key: "geoip",       label: "GeoIP / ASN",   icon: Map,         desc: "Country, region, city, coords, timezone" },
   { key: "mha",         label: "Header analyzer", icon: Mail,      desc: "Parse email headers: hops, delays, auth, spam verdicts" },
+  { key: "speedtest",   label: "Speed test",      icon: Clock,      desc: "DNS, TCP, TLS, HTTP, WHOIS performance metrics" },
 ];
 
 export default function Home() {
@@ -58,6 +59,11 @@ export default function Home() {
         return;
       }
       const params = new URLSearchParams();
+      if (which === "speedtest") {
+        // Speed test is self-contained — no domain API call needed
+        setData({ _speedtest: true });
+        return;
+      }
       // Each endpoint uses a slightly different parameter name; map here.
       const paramKey =
         which === "blacklist" ? "ip" :
@@ -166,7 +172,7 @@ export default function Home() {
       </section>
 
       {/* Tabs */}
-      {(submitted || tab === "mha") && (
+      {(submitted || (tab as TabKey) !== "lookup" || tab === "mha") && (
         <section className="container mx-auto px-6">
           <div className="overflow-x-auto -mx-2 px-2">
             <div className="flex gap-2 pb-2 min-w-max">
@@ -209,14 +215,27 @@ export default function Home() {
             </button>
           </div>
         )}
-        {!submitted && tab !== "mha" && (
+        {tab === "speedtest" && (
+          <div className="max-w-3xl mx-auto">
+            <SpeedTestView data={data} />
+          </div>
+        )}
+        {!submitted && tab === "lookup" && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
             {TABS.map((t) => {
               const Icon = t.icon;
               return (
                 <button
                   key={t.key}
-                  onClick={() => setTab(t.key)}
+                  onClick={() => {
+                    setTab(t.key);
+                    if (t.key === "speedtest") return; // self-contained, no API call needed
+                    if (submitted) {
+                      run(t.key, submitted);
+                    } else {
+                      document.querySelector<HTMLInputElement>('input[placeholder*="example.com"]')?.focus();
+                    }
+                  }}
                   className="premium-surface premium-card rounded-xl p-4 text-left cursor-pointer"
                 >
                   <Icon className="w-4 h-4 text-orange-400 mb-2" />
@@ -228,7 +247,7 @@ export default function Home() {
           </div>
         )}
 
-        {(submitted || tab === "mha") && error && (
+        {(submitted || tab === "mha" || tab === "speedtest") && error && (
           <div className="max-w-3xl mx-auto p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-200">
             <strong>Error:</strong> {error}
           </div>
@@ -257,6 +276,7 @@ export default function Home() {
             {tab === "traceroute" && <TracerouteView data={data} />}
             {tab === "geoip" && <GeoIPView data={data} />}
             {tab === "mha" && <MHAView data={data} />}
+            {tab === "speedtest" && <SpeedTestView data={data} />}
           </div>
         )}
       </section>
@@ -986,11 +1006,335 @@ function MHAView({ data }: { data: any }) {
               <div key={k} className="break-all bg-white/[0.02] rounded p-2 border border-white/5">
                 <span className="text-orange-300 font-bold">{k}</span>
                 <br />
-                <span className="text-foreground/70">{String(v)}</span>
+                 <span className="text-foreground/70">{String(v)}</span>
               </div>
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function SpeedTestView({ data }: { data: any }) {
+  const [phase, setPhase] = useState<"idle" | "ping" | "download" | "upload" | "done">("idle");
+  const [pingMs, setPingMs] = useState<number | null>(null);
+  const [jitterMs, setJitterMs] = useState<number | null>(null);
+  const [downloadMbps, setDownloadMbps] = useState<number | null>(null);
+  const [uploadMbps, setUploadMbps] = useState<number | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [servers, setServers] = useState<any[]>([]);
+  const [selectedServer, setSelectedServer] = useState<string>("jnb");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const API_URL = API;
+
+  useEffect(() => {
+    fetch(`${API_URL}/speedtest/servers`).then(r => r.json()).then(d => setServers(d.servers || [])).catch(() => {});
+  }, []);
+
+  const currentServer = servers.find(s => s.id === selectedServer) || servers[0];
+
+  const measurePing = async (): Promise<number> => {
+    const samples: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      const start = performance.now();
+      await fetch(`${API_URL}/speedtest/ping?t=${Date.now()}`, { cache: "no-store" });
+      samples.push(performance.now() - start);
+    }
+    samples.sort((a, b) => a - b);
+    const median = samples[Math.floor(samples.length / 2)];
+    const jitter = Math.max(...samples) - Math.min(...samples);
+    setJitterMs(Math.round(jitter * 10) / 10);
+    return median;
+  };
+
+  const measureDownload = async (): Promise<number> => {
+    const sizes = [1024 * 100, 1024 * 500, 1024 * 1024, 1024 * 1024 * 5, 1024 * 1024 * 10, 1024 * 1024 * 25];
+    let totalBytes = 0;
+    let totalMs = 0;
+    for (let i = 0; i < sizes.length; i++) {
+      const bytes = sizes[i];
+      setProgress(((i + 1) / sizes.length) * 100);
+      const start = performance.now();
+      const res = await fetch(`${API_URL}/speedtest/download?bytes=${bytes}`, { cache: "no-store" });
+      await res.arrayBuffer();
+      const elapsed = performance.now() - start;
+      totalBytes += bytes;
+      totalMs += elapsed;
+    }
+    const mbps = (totalBytes * 8) / (totalMs / 1000) / 1_000_000;
+    return Math.round(mbps * 10) / 10;
+  };
+
+  const measureUpload = async (): Promise<number> => {
+    const sizes = [1024 * 100, 1024 * 500, 1024 * 1024, 1024 * 1024 * 5, 1024 * 1024 * 10];
+    let totalBytes = 0;
+    let totalMs = 0;
+    for (let i = 0; i < sizes.length; i++) {
+      const bytes = sizes[i];
+      setProgress(((i + 1) / sizes.length) * 100);
+      const chunks: Uint8Array[] = [];
+      let remaining = bytes;
+      while (remaining > 0) {
+        const chunkSize = Math.min(remaining, 65536);
+        const chunk = new Uint8Array(chunkSize);
+        crypto.getRandomValues(chunk);
+        chunks.push(chunk);
+        remaining -= chunkSize;
+      }
+      const payload = chunks.length === 1 ? chunks[0] : (() => {
+        const merged = new Uint8Array(bytes);
+        let offset = 0;
+        for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+        return merged;
+      })();
+      const start = performance.now();
+      await fetch(`${API_URL}/speedtest/upload`, { method: "POST", body: payload, cache: "no-store" });
+      const elapsed = performance.now() - start;
+      totalBytes += bytes;
+      totalMs += elapsed;
+    }
+    const mbps = (totalBytes * 8) / (totalMs / 1000) / 1_000_000;
+    return Math.round(mbps * 10) / 10;
+  };
+
+  const saveResult = async (ping: number, jitter: number, dl: number, ul: number) => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch(`${API_URL}/speedtest/results`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pingMs: ping,
+          jitterMs: jitter,
+          downloadMbps: dl,
+          uploadMbps: ul,
+          serverId: selectedServer,
+        }),
+      });
+      if (!res.ok) throw new Error(`Save failed (${res.status})`);
+      const d = await res.json();
+      if (d.shareUrl) setShareUrl(window.location.origin + d.shareUrl);
+    } catch (e: any) {
+      console.error("Speed test save failed:", e);
+      setSaveError(e?.message || "Failed to save result");
+    }
+    setSaving(false);
+  };
+
+  const runTest = async () => {
+    setPhase("ping");
+    setProgress(0);
+    setPingMs(null);
+    setJitterMs(null);
+    setDownloadMbps(null);
+    setUploadMbps(null);
+    setShareUrl(null);
+    setSaveError(null);
+    setError(null);
+    try {
+      const ping = await measurePing();
+      setPingMs(Math.round(ping * 10) / 10);
+
+      setPhase("download");
+      setProgress(0);
+      const dl = await measureDownload();
+      setDownloadMbps(dl);
+
+      setPhase("upload");
+      setProgress(0);
+      const ul = await measureUpload();
+      setUploadMbps(ul);
+
+      setPhase("done");
+      saveResult(ping, jitterMs ?? 0, dl, ul);
+    } catch (e: any) {
+      setError(e?.message || "Test failed");
+      setPhase("idle");
+    }
+  };
+
+  const formatSpeed = (mbps: number | null) => {
+    if (mbps === null) return "—";
+    if (mbps >= 1000) return `${(mbps / 1000).toFixed(1)} Gbps`;
+    return `${mbps.toFixed(1)} Mbps`;
+  };
+
+  const getSpeedColor = (mbps: number | null) => {
+    if (mbps === null) return "#666";
+    if (mbps >= 100) return "#10b981";
+    if (mbps >= 50) return "#22c55e";
+    if (mbps >= 20) return "#eab308";
+    if (mbps >= 5) return "#f97316";
+    return "#ef4444";
+  };
+
+  const getNeedleAngle = (mbps: number | null) => {
+    if (mbps === null) return -135;
+    const maxSpeed = 200;
+    const ratio = Math.min(mbps / maxSpeed, 1);
+    return -135 + ratio * 270;
+  };
+
+  const Gauge = ({ value, label, unit }: { value: number | null; label: string; unit: string }) => {
+    const angle = getNeedleAngle(value);
+    const color = getSpeedColor(value);
+    return (
+      <div className="flex flex-col items-center">
+        <svg viewBox="0 0 200 120" className="w-48 h-28">
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1a1a2e" strokeWidth="12" strokeLinecap="round" />
+          <path d="M 20 100 A 80 80 0 0 1 56 32" fill="none" stroke="#ef4444" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+          <path d="M 56 32 A 80 80 0 0 1 100 20" fill="none" stroke="#f97316" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+          <path d="M 100 20 A 80 80 0 0 1 144 32" fill="none" stroke="#eab308" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+          <path d="M 144 32 A 80 80 0 0 1 180 100" fill="none" stroke="#10b981" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+          <line x1="100" y1="100" x2="100" y2="30" stroke={color} strokeWidth="2.5" strokeLinecap="round" transform={`rotate(${angle}, 100, 100)`} style={{ transition: "transform 0.3s ease-out" }} />
+          <circle cx="100" cy="100" r="5" fill={color} />
+        </svg>
+        <p className="text-3xl font-display font-bold tabular-nums mt-1" style={{ color }}>
+          {value !== null ? value.toFixed(1) : "—"}
+        </p>
+        <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">{unit}</p>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <p className="eyebrow mb-1">Speed test</p>
+          <h3 className="font-display text-xl font-bold tracking-tight">
+            {currentServer?.name || "NexusDNS"} — {currentServer?.location || "Server"}
+          </h3>
+        </div>
+        {phase !== "idle" && phase !== "done" && (
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-400" />
+            <span className="text-xs text-muted-foreground capitalize">{phase}…</span>
+          </div>
+        )}
+      </div>
+
+      {/* Server selector */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <label className="text-[11px] text-muted-foreground uppercase tracking-wider">Server:</label>
+        <div className="flex gap-1.5 flex-wrap">
+          {servers.map(s => (
+            <button
+              key={s.id}
+              onClick={() => setSelectedServer(s.id)}
+              disabled={phase !== "idle"}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all border ${
+                selectedServer === s.id
+                  ? "bg-orange-500/10 text-orange-300 border-orange-500/20"
+                  : "bg-white/[0.02] text-muted-foreground/70 border-white/[0.04] hover:bg-white/[0.04] hover:text-foreground"
+              } disabled:opacity-50`}
+            >
+              {s.location}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main gauge area */}
+      <div className="premium-surface premium-card rounded-2xl p-8">
+        <div className="flex flex-col items-center">
+          {phase === "idle" && !error && (
+            <>
+              <p className="text-sm text-muted-foreground mb-6">Test your internet speed against our server</p>
+              <button
+                onClick={runTest}
+                className="w-20 h-20 rounded-full bg-orange-500 hover:bg-orange-400 text-white font-display font-bold text-lg transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_-5px_rgba(249,115,22,0.4)]"
+              >
+                GO
+              </button>
+            </>
+          )}
+
+          {phase !== "idle" && (
+            <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-12">
+              <Gauge value={pingMs} label="Ping" unit="ms" />
+              <Gauge value={downloadMbps} label="Download" unit="Mbps" />
+              <Gauge value={uploadMbps} label="Upload" unit="Mbps" />
+            </div>
+          )}
+
+          {phase !== "idle" && phase !== "done" && (
+            <div className="w-full max-w-md mt-6">
+              <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-full bg-orange-500 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Results summary */}
+      {phase === "done" && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="premium-surface premium-card rounded-xl p-4 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Ping</p>
+              <p className="font-display text-xl font-bold" style={{ color: pingMs !== null && pingMs < 30 ? "#10b981" : pingMs !== null && pingMs < 60 ? "#eab308" : "#f97316" }}>
+                {pingMs !== null ? `${pingMs.toFixed(1)}ms` : "—"}
+              </p>
+            </div>
+            <div className="premium-surface premium-card rounded-xl p-4 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Jitter</p>
+              <p className="font-display text-xl font-bold" style={{ color: jitterMs !== null && jitterMs < 10 ? "#10b981" : jitterMs !== null && jitterMs < 30 ? "#eab308" : "#f97316" }}>
+                {jitterMs !== null ? `${jitterMs.toFixed(1)}ms` : "—"}
+              </p>
+            </div>
+            <div className="premium-surface premium-card rounded-xl p-4 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Download</p>
+              <p className="font-display text-xl font-bold" style={{ color: getSpeedColor(downloadMbps) }}>
+                {formatSpeed(downloadMbps)}
+              </p>
+            </div>
+            <div className="premium-surface premium-card rounded-xl p-4 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Upload</p>
+              <p className="font-display text-xl font-bold" style={{ color: getSpeedColor(uploadMbps) }}>
+                {formatSpeed(uploadMbps)}
+              </p>
+            </div>
+          </div>
+
+          {/* Share link */}
+          {shareUrl && (
+            <div className="premium-surface rounded-xl p-4 flex items-center gap-3">
+              <LinkIcon className="w-4 h-4 text-orange-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Share this result</p>
+                <p className="text-sm font-mono text-foreground/80 truncate">{shareUrl}</p>
+              </div>
+              <button
+                onClick={() => navigator.clipboard.writeText(shareUrl)}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-orange-500/10 text-orange-300 border border-orange-500/20 hover:bg-orange-500/20 transition-all shrink-0"
+              >
+                Copy
+              </button>
+            </div>
+          )}
+          {saving && <p className="text-[11px] text-muted-foreground text-center">Saving result…</p>}
+          {saveError && <p className="text-[11px] text-red-400 text-center">{saveError}</p>}
+        </>
+      )}
+
+      {error && (
+        <div className="premium-surface rounded-xl p-4 border border-red-500/30 bg-red-500/10 text-sm text-red-200">
+          <strong>Error:</strong> {error}
+        </div>
+      )}
+
+      {phase === "done" && (
+        <button onClick={runTest} className="btn-primary px-6 py-2.5 rounded-xl text-sm font-semibold">
+          Test Again
+        </button>
       )}
     </div>
   );

@@ -9,6 +9,7 @@ const dns = require('node:dns/promises');
 const net = require('node:net');
 const { classifyIp, normaliseDomain } = require('../lib/validate');
 const { memoizeAsync } = require('../lib/cache');
+const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
@@ -65,7 +66,7 @@ async function lookupBlacklists(ip) {
 
 const cached = memoizeAsync(lookupBlacklists, { ttl: 5 * 60_000, keyFn: (ip) => ip });
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   let target = String(req.query.ip || req.query.q || '').trim();
 
   // If they passed a domain, resolve to A records and check each.
@@ -96,6 +97,6 @@ router.get('/', async (req, res) => {
       detail: err.message,
     });
   }
-});
+}));
 
 module.exports = router;
