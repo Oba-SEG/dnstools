@@ -1,0 +1,50 @@
+name: "Feature request"
+description: "Suggest a feature or improvement for Nexus DNS"
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea — suggestions get reviewed and triaged weekly. 🚀
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What were you trying to do, and what got in the way?
+      placeholder: "I wanted to check ... but ..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should it work? Sketch the ideal UX if you can.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Anything you currently use or tried instead.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Which surface does this touch?
+      options:
+        - "API (backend)"
+        - "Web UI (frontend)"
+        - "Deployment / infra"
+        - "Docs"
+    validations:
+      required: true
+  - type: dropdown
+    id: importance
+    attributes:
+      label: How important is this to you?
+      options:
+        - "Nice to have"
+        - "Would improve my workflow"
+        - "It's a blocker"
+    validations:
+      required: true

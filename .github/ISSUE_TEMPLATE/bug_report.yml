@@ -1,0 +1,46 @@
+name: "Bug report"
+description: "Report a problem with the API or the web UI"
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where did it happen?
+      options:
+        - "Web UI (oba-seg.github.io/dnstools)"
+        - "API (ndns-api.onrender.com)"
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Request URL or UI path
+      description: e.g. /api/whois?domain=example.com
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include the exact error message / HTTP status if shown.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Run whois on ...\n2. ..."
+    validations:
+      required: true
+  - type: input
+    id: when
+    attributes:
+      label: When did it happen (UTC)?
+      description: Helps us match it against server-side metrics/logs.
