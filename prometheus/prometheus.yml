@@ -3,13 +3,18 @@ global:
   evaluation_interval: 30s
 
 scrape_configs:
-  - job_name: nexus-dns-api
+  - job_name: nexus-dns-api-live
+    scheme: https
     metrics_path: /metrics
     static_configs:
-      - targets: ["ndns-api:4001"]
+      - targets: ["ndns-api.onrender.com"]
     relabel_configs:
       - target_label: app
         replacement: nexus-dns
+      - target_label: env
+        replacement: production
+      - target_label: host
+        replacement: render
 
 remote_write:
   - url: https://prometheus-prod-55-prod-gb-south-1.grafana.net/api/prom/push
