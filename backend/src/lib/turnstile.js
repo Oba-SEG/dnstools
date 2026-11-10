@@ -37,7 +37,7 @@ function pruneSeen(now) {
 
 let fetchThroughCache;
 
-async function verifyToken(token, remoteip) {
+async function verifyToken(token, remoteip, req) {
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) return true; // gate disabled
   if (!token || typeof token !== 'string' || token.length > MAX_TOKEN_LEN) return false;
@@ -66,7 +66,11 @@ async function verifyToken(token, remoteip) {
       return true;
     }
     const data = await res.json();
-    return data.success === true;
+    if (data.success === true) return true;
+    // Surface Cloudflare's error-codes so failures diagnose themselves
+    // instead of a generic "bot check failed".
+    req.turnstileCodes = data['error-codes'] || ['unknown'];
+    return false;
   } catch (err) {
     console.error('[turnstile] siteverify unreachable — failing open:', err.message);
     return true;
@@ -79,11 +83,11 @@ function requireTurnstile() {
     if (!process.env.TURNSTILE_SECRET_KEY) return next();
 
     const token = req.get('x-turnstile-token') || req.query.turnstile || '';
-    const ok = await verifyToken(String(token).trim(), req.ip);
+    const ok = await verifyToken(String(token).trim(), req.ip, req);
     if (ok) return next();
 
     res.status(400).json({
-      error: 'Bot check failed or missing. A Turnstile challenge token must be delivered in the x-turnstile-token header.',
+      error: `Bot check failed (${(req.turnstileCodes || ['missing-token']).join(', ')}). Reload the page and retry.`,
     });
   };
 }
