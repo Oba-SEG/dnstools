@@ -115,6 +115,9 @@ function mintOnce(): Promise<TurnstileResult> {
         containerEl = ensureContainer();
         containerEl.style.display = "flex";
         if (widgetId === null) renderWidget(ts);
+        // Turnstile widgets are one-shot: an already-solved widget ignores
+        // a bare execute(). Reset it so every mint gets a fresh challenge.
+        try { ts.reset(widgetId as string); } catch { /* first run: nothing to reset */ }
         pendingResolve = (t, reason) => {
           clearTimeout(grace);
           if (t) done(t, "ok");
