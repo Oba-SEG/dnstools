@@ -2,6 +2,8 @@ services:
   ndns-api:
     build: ./backend
     container_name: nexus-dns-api
+    cap_add:
+      - NET_RAW
     environment:
       NODE_ENV: production
       PORT: "4001"

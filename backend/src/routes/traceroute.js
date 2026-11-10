@@ -31,9 +31,10 @@ function runTraceroute(ip) {
   return new Promise((resolve, reject) => {
     // Strict argv. No shell. -n skips DNS resolution per hop (we resolve
     // separately), -m limits hops, -w limits per-probe wait, -q limits
-    // probes per hop. Use TCP mode (-T) on port 80 since UDP / ICMP often
-    // get firewalled.
-    const args = ['-n', '-w', '2', '-m', String(MAX_HOPS), '-q', '1', ip];
+    // probes per hop. -T is TCP-SYN on port 80: works without ICMP and
+    // survivess datacenter egress filtering (container has cap_net_raw
+    // granted to the traceroute binary via setcap in the Dockerfile).
+    const args = ['-n', '-T', '-p', '80', '-w', '2', '-m', String(MAX_HOPS), '-q', '1', ip];
     const proc = spawn('traceroute', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
     let stdout = '';
