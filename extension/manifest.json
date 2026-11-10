@@ -3,7 +3,7 @@
   "name": "Nexus DNS Lookup",
   "version": "1.0.0",
   "description": "Instant DNS record checks for any domain via the free Nexus Domain Tools API.",
-  "permissions": ["contextMenus"],
+  "permissions": ["contextMenus", "activeTab"],
   "host_permissions": ["https://ndns-api.onrender.com/*"],
   "action": {
     "default_popup": "popup.html",

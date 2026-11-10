@@ -21,6 +21,12 @@
       border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03);
       color: inherit; font-size: 12px; outline: none;
     }
+    input:focus-visible { outline: 2px solid #f97316; outline-offset: 1px; }
+    label[for="domain"] {
+      display: block; margin: 10px 0 4px;
+      font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: rgba(232,234,242,0.45);
+    }
     button {
       width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: 8px;
       background: linear-gradient(135deg, #f97316, #ea580c); color: #0b0d14;
@@ -44,6 +50,7 @@
 </head>
 <body>
   <h1><span class="mark">N</span>Nexus DNS Lookup</h1>
+  <label for="domain">Domain</label>
   <input id="domain" placeholder="example.com" spellcheck="false" autocomplete="off" />
   <button id="go">Check</button>
   <div id="out"></div>
