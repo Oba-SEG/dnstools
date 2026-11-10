@@ -79,9 +79,17 @@ export default function Home() {
       // Heavy endpoints are bot-gated server-side; mint a Turnstile token
       // (no-op when the protection isn't configured) and send it along.
       const HEAVY = new Set(["propagation", "tls", "whois", "headers", "blacklist", "ping", "portcheck", "probe", "traceroute"]);
-      let tsToken: string | null = null;
-      if (HEAVY.has(which)) tsToken = await getTurnstileToken();
-      const headers: Record<string, string> = tsToken ? { "x-turnstile-token": tsToken } : {};
+      const headers: Record<string, string> = {};
+      if (HEAVY.has(which)) {
+        const ts = await getTurnstileToken();
+        if (ts.token) {
+          headers["x-turnstile-token"] = ts.token;
+        } else {
+          throw new Error(
+            `Security check didn't complete (${ts.reason}). Disable any ad/tracker blocker for this page and press Run again.`
+          );
+        }
+      }
       const res = await fetch(`${API}/${which}?${params.toString()}`, { headers });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
