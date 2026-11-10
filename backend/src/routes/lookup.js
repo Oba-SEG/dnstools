@@ -56,3 +56,5 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 module.exports = router;
+module.exports.SUPPORTED_TYPES = SUPPORTED_TYPES;
+module.exports.cachedResolve = cachedResolve;

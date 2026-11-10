@@ -4,13 +4,29 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Search, Globe, Mail, ShieldCheck, Server, Map, FileSearch, AlertTriangle,
   CheckCircle2, XCircle, Loader2, Lock, ChevronRight, Network, Radio, Clock, LinkIcon,
+  GitCompare, ListChecks,
 } from "lucide-react";
 import { WorldMap } from "@/components/world-map";
 import { getTurnstileToken } from "@/lib/turnstile";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 
-type TabKey = "lookup" | "propagation" | "email" | "tls" | "whois" | "headers" | "blacklist" | "dnssec" | "ping" | "portcheck" | "probe" | "traceroute" | "geoip" | "mha" | "speedtest";
+function multiTargets(input: string): string[] {
+  return input
+    .split(/[\s,;]+/)
+    .map(s => s.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0])
+    .filter(Boolean);
+}
+
+async function mintHeavyHeader(): Promise<Record<string, string>> {
+  const ts = await getTurnstileToken();
+  if (ts.token) return { "x-turnstile-token": ts.token };
+  throw new Error(
+    `Security check didn't complete (${ts.reason}). Disable any ad/tracker blocker for this page and press Run again.`
+  );
+}
+
+type TabKey = "lookup" | "propagation" | "email" | "tls" | "whois" | "headers" | "blacklist" | "dnssec" | "ping" | "portcheck" | "probe" | "traceroute" | "geoip" | "mha" | "speedtest" | "compare" | "batch";
 
 const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
   { key: "lookup",      label: "DNS records",   icon: Globe,       desc: "All record types (A, AAAA, MX, NS, TXT, SOA, SRV, CAA)" },
@@ -28,6 +44,8 @@ const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
   { key: "geoip",       label: "GeoIP / ASN",   icon: Map,         desc: "Country, region, city, coords, timezone" },
   { key: "mha",         label: "Header analyzer", icon: Mail,      desc: "Parse email headers: hops, delays, auth, spam verdicts" },
   { key: "speedtest",   label: "Speed test",      icon: Clock,      desc: "DNS, TCP, TLS, HTTP, WHOIS performance metrics" },
+  { key: "compare",     label: "Compare",         icon: GitCompare, desc: "Diff DNS records + WHOIS facts for two domains" },
+  { key: "batch",       label: "Batch",           icon: ListChecks, desc: "Auditor mode: WHOIS or DNS over up to 10 domains" },
 ];
 
 export default function Home() {
@@ -39,6 +57,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [propType, setPropType] = useState<"A" | "AAAA" | "CNAME" | "MX" | "NS" | "TXT">("A");
   const [mhaInput, setMhaInput] = useState("");
+  const [batchMode, setBatchMode] = useState<"whois" | "dns">("whois");
 
   const run = async (which: TabKey, target: string) => {
     if (!target && which !== "mha") return;
@@ -63,6 +82,34 @@ export default function Home() {
       if (which === "speedtest") {
         // Speed test is self-contained — no domain API call needed
         setData({ _speedtest: true });
+        return;
+      }
+      if (which === "compare") {
+        const list = multiTargets(target);
+        if (list.length !== 2) {
+          throw new Error("Compare needs exactly two domains, comma-separated: example.com, other.com");
+        }
+        const headers = await mintHeavyHeader();
+        const res = await fetch(`${API}/compare?${new URLSearchParams({ domain1: list[0], domain2: list[1] })}`, { headers });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        setData(await res.json());
+        return;
+      }
+      if (which === "batch") {
+        const list = multiTargets(target);
+        if (list.length === 0) {
+          throw new Error("Batch needs a list of domains (1–10), comma- or newline-separated.");
+        }
+        const headers = await mintHeavyHeader();
+        const res = await fetch(`${API}/batch?${new URLSearchParams({ domains: list.join(","), mode: batchMode })}`, { headers });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        setData(await res.json());
         return;
       }
       // Each endpoint uses a slightly different parameter name; map here.
@@ -104,14 +151,30 @@ export default function Home() {
     }
   };
 
-  // Re-run when tab or propType changes
+  // Deep link support: /dnstools/?domain=foo.com&tool=whois
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("domain");
+    if (!raw) return;
+    const cleaned = raw.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
+    const okShape = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(cleaned) || /^(\d{1,3}\.){3}\d{1,3}$/.test(cleaned);
+    if (!cleaned || !okShape) return;
+    const tool = params.get("tool");
+    const toolOk = !!(tool && TABS.some((t) => t.key === tool));
+    setDomain(cleaned);
+    setSubmitted(cleaned);
+    run(toolOk ? (tool as TabKey) : "lookup", cleaned);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-run when tab, propType or batch mode changes
   useEffect(() => {
     if (submitted && tab !== "mha") {
       setData(null);
       run(tab, submitted);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, propType]);
+  }, [tab, propType, batchMode]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,7 +227,7 @@ export default function Home() {
               autoFocus
               spellCheck={false}
               autoComplete="off"
-              placeholder="example.com"
+              placeholder={tab === "compare" ? "example.com, other.org" : tab === "batch" ? "a.com, b.io, c.net (max 10)" : "example.com"}
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
               className="flex-1 h-11 pl-10 pr-3 bg-transparent text-sm font-medium placeholder:text-muted-foreground/40 focus:outline-none rounded-xl"
@@ -235,6 +298,22 @@ export default function Home() {
             <SpeedTestView data={data} />
           </div>
         )}
+        {tab === "batch" && (
+          <div className="max-w-lg mx-auto mb-6 flex justify-center gap-2">
+            {(["whois", "dns"] as const).map((m) => {
+              const active = batchMode === m;
+              return (
+                <button
+                  key={m}
+                  onClick={() => setBatchMode(m)}
+                  className={`px-4 py-2 rounded-lg text-[11px] font-semibold border transition-all ${active ? 'bg-orange-500/10 text-orange-300 border-orange-500/20' : 'bg-white/[0.02] text-muted-foreground/70 border-white/[0.04] hover:text-foreground'}`}
+                >
+                  {m === "whois" ? "WHOIS facts" : "DNS records"}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {!submitted && tab === "lookup" && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
             {TABS.map((t) => {
@@ -292,6 +371,8 @@ export default function Home() {
             {tab === "geoip" && <GeoIPView data={data} />}
             {tab === "mha" && <MHAView data={data} />}
             {tab === "speedtest" && <SpeedTestView data={data} />}
+            {tab === "compare" && <CompareView data={data} />}
+            {tab === "batch" && <BatchView data={data} mode={batchMode} />}
           </div>
         )}
       </section>
@@ -878,6 +959,143 @@ function GeoIPView({ data }: { data: any }) {
           <p className="font-mono text-xs">{data.range[0]} – {data.range[1]}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+function CompareView({ data }: { data: any }) {
+  if (!data?.diff) return null;
+  const aDom = data.a?.domain || "A";
+  const bDom = data.b?.domain || "B";
+  const diff = data.diff || {};
+  const whoisSelected: [string, any][] = Object.entries(diff.whois || {}).map(([k, v]) => [
+    k === "registrar" ? "Registrar" : k === "created" ? "Created" : k === "expires" ? "Expires" : k === "dnssec" ? "DNSSEC" : k === "status" ? "Status" : k === "nameservers" ? "Nameservers" : k,
+    v,
+  ]);
+  const dnsDiffs = Object.entries(diff.dns || {});
+  const anyDiff = whoisSelected.some(([, v]) => !v?.same) || dnsDiffs.length > 0;
+  const fmt = (v: string) => {
+    if (!v) return "—";
+    return Array.isArray(v) ? v.join(", ") : String(v);
+  };
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 max-w-3xl mx-auto">
+        <div className="premium-surface premium-card rounded-xl p-3 text-center">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-1">A</p>
+          <p className="font-display font-bold text-sm truncate text-orange-300">{aDom}</p>
+        </div>
+        <div className="premium-surface premium-card rounded-xl p-3 text-center">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-1">B</p>
+          <p className="font-display font-bold text-sm truncate text-orange-300">{bDom}</p>
+        </div>
+      </div>
+
+      {!anyDiff && (
+        <div className="premium-surface rounded-xl p-4 text-center text-xs text-emerald-300 max-w-3xl mx-auto">
+          Identical on everything we compare (WHOIS facts + DNS record sets).
+        </div>
+      )}
+
+      {whoisSelected.length > 0 && (
+        <div className="premium-surface rounded-xl p-4 max-w-3xl mx-auto">
+          <p className="eyebrow mb-2">WHOIS</p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                <th className="text-left py-1.5 pr-3 font-semibold">Field</th>
+                <th className="text-left py-1.5 pr-3 font-semibold truncate">{aDom}</th>
+                <th className="text-left py-1.5 font-semibold truncate">{bDom}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {whoisSelected.map(([k, v]) => (
+                <tr key={k} className={`border-b border-white/5 last:border-0 ${!v?.same ? "bg-orange-500/[0.04]" : ""}`}>
+                  <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap align-top w-24">
+                    {k}
+                    {!v?.same && <span className="ml-1.5 text-orange-400">≠</span>}
+                  </td>
+                  <td className="py-1.5 pr-3 text-foreground break-all">{fmt(v?.a)}</td>
+                  <td className="py-1.5 text-foreground break-all">{fmt(v?.b)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {dnsDiffs.length > 0 && (
+        <div className="premium-surface rounded-xl p-4 max-w-3xl mx-auto">
+          <p className="eyebrow mb-2">DNS — records only present on one side</p>
+          <div className="space-y-2">
+            {dnsDiffs.map(([t, v]: [string, any]) => (
+              <div key={t} className="rounded-lg border border-white/[0.06] p-2.5">
+                <p className="text-[11px] font-bold text-orange-300 mb-1">{t}</p>
+                {v?.only_a?.length > 0 && (
+                  <p className="text-[11px] break-all"><span className="text-muted-foreground/60">{aDom}: </span><span className="font-mono">{v.only_a.join(" · ")}</span></p>
+                )}
+                {v?.only_b?.length > 0 && (
+                  <p className="text-[11px] break-all mt-0.5"><span className="text-muted-foreground/60">{bDom}: </span><span className="font-mono">{v.only_b.join(" · ")}</span></p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {dnsDiffs.length === 0 && Object.keys(diff.whois || {}).length > 0 && (
+        <div className="premium-surface rounded-xl p-4 text-center text-xs text-muted-foreground max-w-3xl mx-auto">
+          No differences in A / AAAA / CNAME / NS / MX / TXT / SOA / CAA records.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BatchView({ data, mode }: { data: any; mode: string }) {
+  if (!data?.results) return null;
+  const expColor = (d: string | null) => {
+    if (!d) return "text-muted-foreground";
+    const t = new Date(d).getTime();
+    if (Number.isNaN(t)) return "text-foreground";
+    const days = (t - Date.now()) / 86_400_000;
+    if (days < 30) return "text-red-300";
+    if (days < 90) return "text-amber-300";
+    return "text-foreground";
+  };
+  return (
+    <div className="space-y-3 max-w-4xl mx-auto">
+      <div className="flex items-center gap-3 flex-wrap justify-center">
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60">Batch · {mode} · {data.count} ok{data.skipped_invalid?.length ? ` · ${data.skipped_invalid.length} skipped` : ""} · {data.elapsed_ms}ms</span>
+      </div>
+      {data.results.map((r: any) => (
+        <div key={r.domain} className="premium-surface rounded-xl p-3.5">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <p className="font-display font-bold text-sm truncate">{r.domain}</p>
+            {r.ok ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <span className="text-[11px] font-mono text-red-300 shrink-0 flex items-center gap-1 truncate max-w-[55%]"><XCircle className="w-3.5 h-3.5" />{r.error}</span>
+            )}
+          </div>
+          {r.ok && mode === "whois" && r.whois && (
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px]">
+              <p><span className="text-muted-foreground/60">Registrar: </span>{r.whois.registrar || "—"}</p>
+              <p><span className="text-muted-foreground/60">Expires: </span><span className={expColor(r.whois.expires)}>{r.whois.expires || "—"}</span></p>
+              <p className="sm:col-span-2 truncate"><span className="text-muted-foreground/60">NS: </span>{(r.whois.nameservers || []).join(", ") || "—"}</p>
+            </div>
+          )}
+          {r.ok && mode === "dns" && Array.isArray(r.dns) && (
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-0.5 text-[11px] font-mono">
+              {r.dns.filter((x: any) => (x.records || []).length > 0).map((x: any) => (
+                <p key={x.type} className="truncate"><span className="text-orange-300 font-bold not-italic font-sans mr-1">{x.type}</span>{x.records.join(" · ")}</p>
+              ))}
+              {r.dns.every((x: any) => (x.records || []).length === 0) && (
+                <p className="text-muted-foreground/60 font-sans not-italic col-span-2">No records found on any type.</p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      width: 340px; margin: 0; padding: 14px;
+      background: #060810; color: #e8eaf2;
+      font: 12px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    .mark {
+      display: inline-flex; width: 22px; height: 22px; border-radius: 6px;
+      background: linear-gradient(135deg, #f97316, #ea580c); color: #0b0d14;
+      font-weight: 800; font-size: 10px; align-items: center; justify-content: center;
+      margin-right: 6px; vertical-align: middle;
+    }
+    h1 { font-size: 12px; margin: 0 0 10px; display: flex; align-items: center; }
+    input {
+      width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03);
+      color: inherit; font-size: 12px; outline: none;
+    }
+    button {
+      width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: 8px;
+      background: linear-gradient(135deg, #f97316, #ea580c); color: #0b0d14;
+      font-weight: 700; font-size: 12px; cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .section { margin-top: 12px; }
+    .section h2 {
+      font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: rgba(232,234,242,0.45); margin: 0 0 5px;
+    }
+    .rec { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.05); word-break: break-all; }
+    .rec:last-child { border-bottom: 0; }
+    .t { color: #fb923c; font-weight: 700; margin-right: 6px; }
+    .ok { color: #34d399; }
+    .bad { color: #f87171; }
+    .dim { color: rgba(232,234,242,0.5); }
+    .badge { display: inline-block; padding: 1px 7px; border-radius: 99px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); font-size: 11px; }
+    a { color: #fdba74; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <h1><span class="mark">N</span>Nexus DNS Lookup</h1>
+  <input id="domain" placeholder="example.com" spellcheck="false" autocomplete="off" />
+  <button id="go">Check</button>
+  <div id="out"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
