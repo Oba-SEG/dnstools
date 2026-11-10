@@ -5,7 +5,7 @@ No login. No payment. No tracking. Built as the public counterpart to
 [Nexus Brand Protection](https://brandprotection.segbytes.co.za) and the
 [Segbytes](https://segbytes.co.za) commercial platform.
 
-**Live:** [https://dns.segbytes.co.za](https://dns.segbytes.co.za) <!-- once deployed -->
+**Live:** [https://oba-seg.github.io/dnstools](https://oba-seg.github.io/dnstools) · API on Render free
 
 ---
 
