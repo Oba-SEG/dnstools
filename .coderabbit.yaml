@@ -1,0 +1,8 @@
+# CodeRabbit review config for Oba-SEG/dnstools
+# Keep reviews focused on source; lockfiles and bundles are machine-generated.
+reviews:
+  path_filters:
+    - "!**/package-lock.json"
+    - "!**/*.min.js"
+chat:
+  auto_reply: true
