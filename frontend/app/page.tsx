@@ -6,6 +6,7 @@ import {
   CheckCircle2, XCircle, Loader2, Lock, ChevronRight, Network, Radio, Clock, LinkIcon,
 } from "lucide-react";
 import { WorldMap } from "@/components/world-map";
+import { getTurnstileToken } from "@/lib/turnstile";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 
@@ -75,7 +76,13 @@ export default function Home() {
         "domain";
       params.set(paramKey, target);
       if (which === "propagation") params.set("type", propType);
-      const res = await fetch(`${API}/${which}?${params.toString()}`);
+      // Heavy endpoints are bot-gated server-side; mint a Turnstile token
+      // (no-op when the protection isn't configured) and send it along.
+      const HEAVY = new Set(["propagation", "tls", "whois", "headers", "blacklist", "ping", "portcheck", "probe", "traceroute"]);
+      let tsToken: string | null = null;
+      if (HEAVY.has(which)) tsToken = await getTurnstileToken();
+      const headers: Record<string, string> = tsToken ? { "x-turnstile-token": tsToken } : {};
+      const res = await fetch(`${API}/${which}?${params.toString()}`, { headers });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
