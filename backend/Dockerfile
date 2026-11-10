@@ -1,10 +1,9 @@
 FROM node:20-alpine
 WORKDIR /app
-# traceroute + libcap: route /api/traceroute spawns the system traceroute.
-# It needs raw sockets (cap_net_raw via setcap) so the unprivileged node
-# user can perform TCP-SYN probes.
-RUN apk add --no-cache traceroute libcap \
-    && setcap 'cap_net_raw=+ep' /usr/bin/traceroute
+# Full traceroute package: auto-falls-back to unprivileged UDP probes
+# (SOCK_DGRAM + IP_RECVERR) when run without CAP_NET_RAW — works as the
+# unprivileged node user both locally and on managed hosts.
+RUN apk add --no-cache traceroute
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY src ./src

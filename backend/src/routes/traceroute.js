@@ -30,11 +30,10 @@ async function resolveAndGuard(target) {
 function runTraceroute(ip) {
   return new Promise((resolve, reject) => {
     // Strict argv. No shell. -n skips DNS resolution per hop (we resolve
-    // separately), -m limits hops, -w limits per-probe wait, -q limits
-    // probes per hop. -T is TCP-SYN on port 80: works without ICMP and
-    // survivess datacenter egress filtering (container has cap_net_raw
-    // granted to the traceroute binary via setcap in the Dockerfile).
-    const args = ['-n', '-T', '-p', '80', '-w', '2', '-m', String(MAX_HOPS), '-q', '1', ip];
+    // separately), -m limits hops, -q limits probes per hop, -w bounds the
+    // wait as MAX,HERE,NEAR. Default (UDP) probes auto-fall back to
+    // unprivileged datagrams, so no capabilities are required anywhere.
+    const args = ['-n', '-m', String(MAX_HOPS), '-q', '1', '-w', '2,1,3', ip];
     const proc = spawn('traceroute', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
     let stdout = '';

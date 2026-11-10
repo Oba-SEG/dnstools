@@ -49,7 +49,22 @@ async function lookupWhois(target) {
   };
 }
 
-const cached = memoizeAsync(lookupWhois, { ttl: 60 * 60_000, keyFn: (d) => d });
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Upstream WHOIS servers occasionally reject a burst with an empty
+// error (observed code 1). Retry once after a short backoff before
+// surfacing failure.
+async function lookupWhoisWithRetry(target) {
+  try {
+    return await lookupWhois(target);
+  } catch (err) {
+    if (err && (err.code === 'ENOENT' || err.killed)) throw err;
+    await sleep(1500);
+    return lookupWhois(target);
+  }
+}
+
+const cached = memoizeAsync(lookupWhoisWithRetry, { ttl: 60 * 60_000, keyFn: (d) => d });
 
 router.get('/', asyncHandler(async (req, res) => {
   const input = (req.query.domain || req.query.q || '').trim();
