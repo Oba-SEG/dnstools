@@ -22,7 +22,7 @@ const getNeedleAngle = (mbps: number) => {
   return -135 + ratio * 270;
 };
 
-function Gauge({ value, unit }: { value: number; unit: string }) {
+function Gauge({ value, unit, label }: { value: number; unit: string; label: string }) {
   const angle = getNeedleAngle(value);
   const color = getSpeedColor(value);
   return (
@@ -36,6 +36,7 @@ function Gauge({ value, unit }: { value: number; unit: string }) {
         <line x1="100" y1="100" x2="100" y2="30" stroke={color} strokeWidth="2.5" strokeLinecap="round" transform={`rotate(${angle}, 100, 100)`} />
         <circle cx="100" cy="100" r="5" fill={color} />
       </svg>
+      <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</p>
       <p className="text-3xl font-display font-bold tabular-nums mt-1" style={{ color }}>{value.toFixed(1)}</p>
       <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">{unit}</p>
     </div>
@@ -110,9 +111,9 @@ export default function SpeedTestResultClient({ pathId }: { pathId?: string }) {
             {/* Gauges */}
             <div className="premium-surface premium-card rounded-2xl p-8">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-12">
-                <Gauge value={result.pingMs} unit="ms" />
-                <Gauge value={result.downloadMbps} unit="Mbps" />
-                <Gauge value={result.uploadMbps} unit="Mbps" />
+                <Gauge value={result.pingMs} label="Ping" unit="ms" />
+                <Gauge value={result.downloadMbps} label="Download" unit="Mbps" />
+                <Gauge value={result.uploadMbps} label="Upload" unit="Mbps" />
               </div>
             </div>
 

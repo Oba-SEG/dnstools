@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Search, Globe, Mail, ShieldCheck, Server, Map, FileSearch, AlertTriangle,
   CheckCircle2, XCircle, Loader2, Lock, ChevronRight, Network, Radio, Clock, LinkIcon,
@@ -62,6 +62,7 @@ function parseDeepLink(): { tool: TabKey; domain: string } | null {
 }
 
 export default function Home() {
+  const runSeq = useRef(0);
   const [deepLink] = useState(() => parseDeepLink());
   const [tab, setTab] = useState<TabKey>(() => deepLink?.tool ?? "lookup");
   const [domain, setDomain] = useState(() => deepLink?.domain ?? "");
@@ -75,8 +76,10 @@ export default function Home() {
 
   const run = async (which: TabKey, target: string) => {
     if (!target && which !== "mha") return;
+    const seq = ++runSeq.current;
     setLoading(true);
     setError(null);
+    const stale = () => seq !== runSeq.current;
     setData(null);
     try {
       if (which === "mha") {
@@ -89,7 +92,8 @@ export default function Home() {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || `HTTP ${res.status}`);
         }
-        setData(await res.json());
+        const body = await res.json();
+        if (!stale()) setData(body);
         return;
       }
       const params = new URLSearchParams();
@@ -116,6 +120,9 @@ export default function Home() {
         const list = multiTargets(target);
         if (list.length === 0) {
           throw new Error("Batch needs a list of domains (1–10), comma- or newline-separated.");
+        }
+        if (list.length > 10) {
+          throw new Error(`Batch supports up to 10 domains (got ${list.length}). Split the list and run twice.`);
         }
         const headers = await mintHeavyHeader();
         const res = await fetch(`${API}/batch?${new URLSearchParams({ domains: list.join(","), mode: batchMode })}`, { headers });
@@ -157,11 +164,11 @@ export default function Home() {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       const body = await res.json();
-      setData(body);
+      if (!stale()) setData(body);
     } catch (e: any) {
-      setError(e?.message || "Request failed");
+      if (!stale()) setError(e?.message || "Request failed");
     } finally {
-      setLoading(false);
+      if (!stale()) setLoading(false);
     }
   };
 
@@ -1067,7 +1074,7 @@ function BatchView({ data, mode }: { data: any; mode: string }) {
   return (
     <div className="space-y-3 max-w-4xl mx-auto">
       <div className="flex items-center gap-3 flex-wrap justify-center">
-        <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60">Batch · {mode} · {data.count} ok{data.skipped_invalid?.length ? ` · ${data.skipped_invalid.length} skipped` : ""} · {data.elapsed_ms}ms</span>
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60">Batch · {mode} · {data.results.filter((r: any) => r.ok).length}/{data.count} ok{data.skipped_invalid?.length ? ` · ${data.skipped_invalid.length} skipped` : ""} · {data.elapsed_ms}ms</span>
       </div>
       {data.results.map((r: any) => (
         <div key={r.domain} className="premium-surface rounded-xl p-3.5">
