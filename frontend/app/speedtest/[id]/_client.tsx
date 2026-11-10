@@ -8,25 +8,51 @@ const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
 const BASE = STATIC_EXPORT ? "/dnstools" : "";
 
+const getSpeedColor = (mbps: number) => {
+  if (mbps >= 100) return "#10b981";
+  if (mbps >= 50) return "#22c55e";
+  if (mbps >= 20) return "#eab308";
+  if (mbps >= 5) return "#f97316";
+  return "#ef4444";
+};
+
+const getNeedleAngle = (mbps: number) => {
+  const maxSpeed = 200;
+  const ratio = Math.min(mbps / maxSpeed, 1);
+  return -135 + ratio * 270;
+};
+
+function Gauge({ value, unit }: { value: number; unit: string }) {
+  const angle = getNeedleAngle(value);
+  const color = getSpeedColor(value);
+  return (
+    <div className="flex flex-col items-center">
+      <svg viewBox="0 0 200 120" className="w-48 h-28">
+        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1a1a2e" strokeWidth="12" strokeLinecap="round" />
+        <path d="M 20 100 A 80 80 0 0 1 56 32" fill="none" stroke="#ef4444" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+        <path d="M 56 32 A 80 80 0 0 1 100 20" fill="none" stroke="#f97316" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+        <path d="M 100 20 A 80 80 0 0 1 144 32" fill="none" stroke="#eab308" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+        <path d="M 144 32 A 80 80 0 0 1 180 100" fill="none" stroke="#10b981" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+        <line x1="100" y1="100" x2="100" y2="30" stroke={color} strokeWidth="2.5" strokeLinecap="round" transform={`rotate(${angle}, 100, 100)`} />
+        <circle cx="100" cy="100" r="5" fill={color} />
+      </svg>
+      <p className="text-3xl font-display font-bold tabular-nums mt-1" style={{ color }}>{value.toFixed(1)}</p>
+      <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">{unit}</p>
+    </div>
+  );
+}
+
 export default function SpeedTestResultClient({ pathId }: { pathId?: string }) {
   const params = useParams();
   const routeId = params?.id as string | undefined;
 
-  const [id, setId] = useState<string | null>(null);
-
-  // Static export serves /speedtest/_/?id=<id>; dynamic (docker/nginx) serves /speedtest/<id>.
-  useEffect(() => {
-    if (pathId && pathId !== "_" && pathId !== "index") {
-      setId(pathId);
-      return;
-    }
+  const [id] = useState<string | null>(() => {
+    if (pathId && pathId !== "_" && pathId !== "index") return pathId;
+    if (typeof window === "undefined") return null;
     const fromQuery = new URLSearchParams(window.location.search).get("id");
-    if (fromQuery) {
-      setId(fromQuery);
-    } else if (routeId && routeId !== "_") {
-      setId(routeId);
-    }
-  }, [pathId, routeId]);
+    if (fromQuery) return fromQuery;
+    return routeId && routeId !== "_" ? routeId : null;
+  });
 
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -47,40 +73,6 @@ export default function SpeedTestResultClient({ pathId }: { pathId?: string }) {
   const formatSpeed = (mbps: number) => {
     if (mbps >= 1000) return `${(mbps / 1000).toFixed(1)} Gbps`;
     return `${mbps.toFixed(1)} Mbps`;
-  };
-
-  const getSpeedColor = (mbps: number) => {
-    if (mbps >= 100) return "#10b981";
-    if (mbps >= 50) return "#22c55e";
-    if (mbps >= 20) return "#eab308";
-    if (mbps >= 5) return "#f97316";
-    return "#ef4444";
-  };
-
-  const getNeedleAngle = (mbps: number) => {
-    const maxSpeed = 200;
-    const ratio = Math.min(mbps / maxSpeed, 1);
-    return -135 + ratio * 270;
-  };
-
-  const Gauge = ({ value, label, unit }: { value: number; label: string; unit: string }) => {
-    const angle = getNeedleAngle(value);
-    const color = getSpeedColor(value);
-    return (
-      <div className="flex flex-col items-center">
-        <svg viewBox="0 0 200 120" className="w-48 h-28">
-          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1a1a2e" strokeWidth="12" strokeLinecap="round" />
-          <path d="M 20 100 A 80 80 0 0 1 56 32" fill="none" stroke="#ef4444" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
-          <path d="M 56 32 A 80 80 0 0 1 100 20" fill="none" stroke="#f97316" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
-          <path d="M 100 20 A 80 80 0 0 1 144 32" fill="none" stroke="#eab308" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
-          <path d="M 144 32 A 80 80 0 0 1 180 100" fill="none" stroke="#10b981" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
-          <line x1="100" y1="100" x2="100" y2="30" stroke={color} strokeWidth="2.5" strokeLinecap="round" transform={`rotate(${angle}, 100, 100)`} />
-          <circle cx="100" cy="100" r="5" fill={color} />
-        </svg>
-        <p className="text-3xl font-display font-bold tabular-nums mt-1" style={{ color }}>{value.toFixed(1)}</p>
-        <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">{unit}</p>
-      </div>
-    );
   };
 
   return (
@@ -118,9 +110,9 @@ export default function SpeedTestResultClient({ pathId }: { pathId?: string }) {
             {/* Gauges */}
             <div className="premium-surface premium-card rounded-2xl p-8">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-12">
-                <Gauge value={result.pingMs} label="Ping" unit="ms" />
-                <Gauge value={result.downloadMbps} label="Download" unit="Mbps" />
-                <Gauge value={result.uploadMbps} label="Upload" unit="Mbps" />
+                <Gauge value={result.pingMs} unit="ms" />
+                <Gauge value={result.downloadMbps} unit="Mbps" />
+                <Gauge value={result.uploadMbps} unit="Mbps" />
               </div>
             </div>
 

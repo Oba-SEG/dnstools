@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Search, Globe, Mail, ShieldCheck, Server, Map, FileSearch, AlertTriangle,
   CheckCircle2, XCircle, Loader2, Lock, ChevronRight, Network, Radio, Clock, LinkIcon,
@@ -48,10 +48,24 @@ const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
   { key: "batch",       label: "Batch",           icon: ListChecks, desc: "Auditor mode: WHOIS or DNS over up to 10 domains" },
 ];
 
+function parseDeepLink(): { tool: TabKey; domain: string } | null {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("domain");
+  if (!raw) return null;
+  const cleaned = raw.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
+  const okShape = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(cleaned) || /^(\d{1,3}\.){3}\d{1,3}$/.test(cleaned);
+  if (!okShape) return null;
+  const tool = params.get("tool");
+  const toolOk = tool && TABS.some((t) => t.key === tool);
+  return { tool: (toolOk ? tool : "lookup") as TabKey, domain: cleaned };
+}
+
 export default function Home() {
-  const [tab, setTab] = useState<TabKey>("lookup");
-  const [domain, setDomain] = useState("");
-  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [deepLink] = useState(() => parseDeepLink());
+  const [tab, setTab] = useState<TabKey>(() => deepLink?.tool ?? "lookup");
+  const [domain, setDomain] = useState(() => deepLink?.domain ?? "");
+  const [submitted, setSubmitted] = useState<string | null>(() => deepLink?.domain ?? null);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -151,27 +165,11 @@ export default function Home() {
     }
   };
 
-  // Deep link support: /dnstools/?domain=foo.com&tool=whois
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const raw = params.get("domain");
-    if (!raw) return;
-    const cleaned = raw.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
-    const okShape = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(cleaned) || /^(\d{1,3}\.){3}\d{1,3}$/.test(cleaned);
-    if (!cleaned || !okShape) return;
-    const tool = params.get("tool");
-    const toolOk = !!(tool && TABS.some((t) => t.key === tool));
-    setDomain(cleaned);
-    setSubmitted(cleaned);
-    run(toolOk ? (tool as TabKey) : "lookup", cleaned);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Re-run when tab, propType or batch mode changes
   useEffect(() => {
     if (submitted && tab !== "mha") {
-      setData(null);
-      run(tab, submitted);
+      const t = setTimeout(() => run(tab, submitted), 0);
+      return () => clearTimeout(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, propType, batchMode]);
@@ -212,7 +210,7 @@ export default function Home() {
         <div className="text-center max-w-xl mx-auto mb-8">
           <p className="text-[10px] uppercase tracking-[0.2em] text-orange-400/80 font-bold mb-3">DNS · Email · TLS · WHOIS · Network</p>
           <h2 className="font-display text-3xl sm:text-[2.5rem] font-bold tracking-tighter leading-[1.1] mb-3">
-            What's actually live<br className="hidden sm:block" /> on your domain.
+            What&apos;s actually live<br className="hidden sm:block" /> on your domain.
           </h2>
           <p className="text-[13px] text-muted-foreground leading-relaxed max-w-md mx-auto">
             15 global resolvers. Email auth audit. TLS inspection. Header analysis. All instant, no account.
@@ -489,9 +487,8 @@ function PropagationView({ data, type, setType }: { data: any; type: string; set
   );
 }
 
-function EmailView({ data }: { data: any }) {
-  if (!data?.spf || !data?.dmarc || !data?.dkim) return null;
-  const Block = ({ title, present, children, className = "" }: any) => (
+function EmailBlock({ title, present, children, className = "" }: any) {
+  return (
     <div className={`premium-surface premium-card rounded-xl p-5 ${className}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -503,6 +500,10 @@ function EmailView({ data }: { data: any }) {
       {children}
     </div>
   );
+}
+
+function EmailView({ data }: { data: any }) {
+  if (!data?.spf || !data?.dmarc || !data?.dkim) return null;
 
   return (
     <div className="space-y-4">
@@ -513,7 +514,7 @@ function EmailView({ data }: { data: any }) {
       </div>
 
       <div className="grid md:grid-cols-2 gap-3">
-        <Block title="SPF" present={data.spf.present}>
+        <EmailBlock title="SPF" present={data.spf.present}>
           {data.spf.present && (
             <>
               <p className="font-mono text-xs bg-white/[0.02] border border-white/5 rounded-md px-3 py-2 break-all">{data.spf.record}</p>
@@ -523,9 +524,9 @@ function EmailView({ data }: { data: any }) {
               </div>
             </>
           )}
-        </Block>
+        </EmailBlock>
 
-        <Block title="DMARC" present={data.dmarc.present}>
+        <EmailBlock title="DMARC" present={data.dmarc.present}>
           {data.dmarc.present && (
             <>
               <p className="font-mono text-xs bg-white/[0.02] border border-white/5 rounded-md px-3 py-2 break-all">{data.dmarc.record}</p>
@@ -536,9 +537,9 @@ function EmailView({ data }: { data: any }) {
               </div>
             </>
           )}
-        </Block>
+        </EmailBlock>
 
-        <Block title="DKIM" present={data.dkim.found.length > 0}>
+        <EmailBlock title="DKIM" present={data.dkim.found.length > 0}>
           {data.dkim.found.length > 0 ? (
             <div className="space-y-1.5">
               {data.dkim.found.map((d: any) => (
@@ -551,9 +552,9 @@ function EmailView({ data }: { data: any }) {
           ) : (
             <p className="text-xs text-muted-foreground">Tried {data.dkim.selectors_checked.length} common selectors. None responded.</p>
           )}
-        </Block>
+        </EmailBlock>
 
-        <Block title="MX" present={data.mx.present}>
+        <EmailBlock title="MX" present={data.mx.present}>
           {data.mx.present && (
             <div className="space-y-1">
               {data.mx.records.map((m: any, i: number) => (
@@ -564,11 +565,11 @@ function EmailView({ data }: { data: any }) {
               ))}
             </div>
           )}
-        </Block>
+        </EmailBlock>
 
-        <Block title="MTA-STS" present={data.mta_sts.present} />
-        <Block title="TLS-RPT" present={data.tls_rpt.present} />
-        <Block title="BIMI" present={data.bimi.present} className="md:col-span-2" />
+        <EmailBlock title="MTA-STS" present={data.mta_sts.present} />
+        <EmailBlock title="TLS-RPT" present={data.tls_rpt.present} />
+        <EmailBlock title="BIMI" present={data.bimi.present} className="md:col-span-2" />
       </div>
     </div>
   );
@@ -1051,17 +1052,18 @@ function CompareView({ data }: { data: any }) {
   );
 }
 
+function batchExpiryColor(d: string | null) {
+  if (!d) return "text-muted-foreground";
+  const t = new Date(d).getTime();
+  if (Number.isNaN(t)) return "text-foreground";
+  const days = (t - Date.now()) / 86_400_000;
+  if (days < 30) return "text-red-300";
+  if (days < 90) return "text-amber-300";
+  return "text-foreground";
+}
+
 function BatchView({ data, mode }: { data: any; mode: string }) {
   if (!data?.results) return null;
-  const expColor = (d: string | null) => {
-    if (!d) return "text-muted-foreground";
-    const t = new Date(d).getTime();
-    if (Number.isNaN(t)) return "text-foreground";
-    const days = (t - Date.now()) / 86_400_000;
-    if (days < 30) return "text-red-300";
-    if (days < 90) return "text-amber-300";
-    return "text-foreground";
-  };
   return (
     <div className="space-y-3 max-w-4xl mx-auto">
       <div className="flex items-center gap-3 flex-wrap justify-center">
@@ -1080,7 +1082,7 @@ function BatchView({ data, mode }: { data: any; mode: string }) {
           {r.ok && mode === "whois" && r.whois && (
             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px]">
               <p><span className="text-muted-foreground/60">Registrar: </span>{r.whois.registrar || "—"}</p>
-              <p><span className="text-muted-foreground/60">Expires: </span><span className={expColor(r.whois.expires)}>{r.whois.expires || "—"}</span></p>
+              <p><span className="text-muted-foreground/60">Expires: </span><span className={batchExpiryColor(r.whois.expires)}>{r.whois.expires || "—"}</span></p>
               <p className="sm:col-span-2 truncate"><span className="text-muted-foreground/60">NS: </span>{(r.whois.nameservers || []).join(", ") || "—"}</p>
             </div>
           )}
@@ -1096,6 +1098,44 @@ function BatchView({ data, mode }: { data: any; mode: string }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function speedColor(mbps: number | null) {
+  if (mbps === null) return "#666";
+  if (mbps >= 100) return "#10b981";
+  if (mbps >= 50) return "#22c55e";
+  if (mbps >= 20) return "#eab308";
+  if (mbps >= 5) return "#f97316";
+  return "#ef4444";
+}
+
+function SpeedGauge({ value, unit }: { value: number | null; unit: string }) {
+  const getNeedleAngle = (mbps: number | null) => {
+    if (mbps === null) return -135;
+    const maxSpeed = 200;
+    const ratio = Math.min(mbps / maxSpeed, 1);
+    return -135 + ratio * 270;
+  };
+
+  const angle = getNeedleAngle(value);
+  const color = speedColor(value);
+  return (
+    <div className="flex flex-col items-center">
+      <svg viewBox="0 0 200 120" className="w-48 h-28">
+        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1a1a2e" strokeWidth="12" strokeLinecap="round" />
+        <path d="M 20 100 A 80 80 0 0 1 56 32" fill="none" stroke="#ef4444" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+        <path d="M 56 32 A 80 80 0 0 1 100 20" fill="none" stroke="#f97316" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+        <path d="M 100 20 A 80 80 0 0 1 144 32" fill="none" stroke="#eab308" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+        <path d="M 144 32 A 80 80 0 0 1 180 100" fill="none" stroke="#10b981" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
+        <line x1="100" y1="100" x2="100" y2="30" stroke={color} strokeWidth="2.5" strokeLinecap="round" transform={`rotate(${angle}, 100, 100)`} style={{ transition: "transform 0.3s ease-out" }} />
+        <circle cx="100" cy="100" r="5" fill={color} />
+      </svg>
+      <p className="text-3xl font-display font-bold tabular-nums mt-1" style={{ color }}>
+        {value !== null ? value.toFixed(1) : "—"}
+      </p>
+      <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">{unit}</p>
     </div>
   );
 }
@@ -1418,44 +1458,6 @@ function SpeedTestView({ data }: { data: any }) {
     return `${mbps.toFixed(1)} Mbps`;
   };
 
-  const getSpeedColor = (mbps: number | null) => {
-    if (mbps === null) return "#666";
-    if (mbps >= 100) return "#10b981";
-    if (mbps >= 50) return "#22c55e";
-    if (mbps >= 20) return "#eab308";
-    if (mbps >= 5) return "#f97316";
-    return "#ef4444";
-  };
-
-  const getNeedleAngle = (mbps: number | null) => {
-    if (mbps === null) return -135;
-    const maxSpeed = 200;
-    const ratio = Math.min(mbps / maxSpeed, 1);
-    return -135 + ratio * 270;
-  };
-
-  const Gauge = ({ value, label, unit }: { value: number | null; label: string; unit: string }) => {
-    const angle = getNeedleAngle(value);
-    const color = getSpeedColor(value);
-    return (
-      <div className="flex flex-col items-center">
-        <svg viewBox="0 0 200 120" className="w-48 h-28">
-          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1a1a2e" strokeWidth="12" strokeLinecap="round" />
-          <path d="M 20 100 A 80 80 0 0 1 56 32" fill="none" stroke="#ef4444" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
-          <path d="M 56 32 A 80 80 0 0 1 100 20" fill="none" stroke="#f97316" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
-          <path d="M 100 20 A 80 80 0 0 1 144 32" fill="none" stroke="#eab308" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
-          <path d="M 144 32 A 80 80 0 0 1 180 100" fill="none" stroke="#10b981" strokeWidth="12" strokeLinecap="round" opacity="0.3" />
-          <line x1="100" y1="100" x2="100" y2="30" stroke={color} strokeWidth="2.5" strokeLinecap="round" transform={`rotate(${angle}, 100, 100)`} style={{ transition: "transform 0.3s ease-out" }} />
-          <circle cx="100" cy="100" r="5" fill={color} />
-        </svg>
-        <p className="text-3xl font-display font-bold tabular-nums mt-1" style={{ color }}>
-          {value !== null ? value.toFixed(1) : "—"}
-        </p>
-        <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-0.5">{unit}</p>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4 flex-wrap">
@@ -1511,9 +1513,9 @@ function SpeedTestView({ data }: { data: any }) {
 
           {phase !== "idle" && (
             <div className="flex flex-col sm:flex-row items-center gap-8 sm:gap-12">
-              <Gauge value={pingMs} label="Ping" unit="ms" />
-              <Gauge value={downloadMbps} label="Download" unit="Mbps" />
-              <Gauge value={uploadMbps} label="Upload" unit="Mbps" />
+              <SpeedGauge value={pingMs} unit="ms" />
+              <SpeedGauge value={downloadMbps} unit="Mbps" />
+              <SpeedGauge value={uploadMbps} unit="Mbps" />
             </div>
           )}
 
@@ -1545,13 +1547,13 @@ function SpeedTestView({ data }: { data: any }) {
             </div>
             <div className="premium-surface premium-card rounded-xl p-4 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Download</p>
-              <p className="font-display text-xl font-bold" style={{ color: getSpeedColor(downloadMbps) }}>
+              <p className="font-display text-xl font-bold" style={{ color: speedColor(downloadMbps) }}>
                 {formatSpeed(downloadMbps)}
               </p>
             </div>
             <div className="premium-surface premium-card rounded-xl p-4 text-center">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Upload</p>
-              <p className="font-display text-xl font-bold" style={{ color: getSpeedColor(uploadMbps) }}>
+              <p className="font-display text-xl font-bold" style={{ color: speedColor(uploadMbps) }}>
                 {formatSpeed(uploadMbps)}
               </p>
             </div>
