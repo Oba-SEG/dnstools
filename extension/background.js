@@ -7,10 +7,14 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener((info) => {
-  const selection = (info.selectionText || "").trim();
-  const m = selection.match(/^(https?:\/\/)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)$/i);
-  const domain = m ? m[2] : selection;
-  if (!domain) return;
-  const url = `https://oba-seg.github.io/dnstools/?domain=${encodeURIComponent(domain)}`;
+  const selection = (info.selectionText || "").trim().toLowerCase();
+  const cleaned = selection
+    .replace(/^https?:\/\//, "")
+    .split("/")[0]
+    .replace(/^["'`]+/, "")
+    .replace(/[.,.;:!?)"'`\s]+$/, "");
+  const m = cleaned.match(/^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/);
+  if (!m) return;
+  const url = `https://oba-seg.github.io/dnstools/?domain=${encodeURIComponent(cleaned)}`;
   chrome.tabs.create({ url });
 });

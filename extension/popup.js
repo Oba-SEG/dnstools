@@ -18,41 +18,69 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
+async function safeJson(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return { _error: `HTTP ${r.status}` };
+    return await r.json();
+  } catch (_) {
+    return { _error: 'network' };
+  }
+}
+
 async function runCheck(target) {
   el.out.innerHTML = '<p class="dim">Checking…</p>';
   el.go.disabled = true;
   try {
     const [recordRes, dnssecRes, emailRes] = await Promise.all([
-      fetch(`${API}/lookup?domain=${encodeURIComponent(target)}`).then(r => r.ok ? r.json() : Promise.reject(new Error(`lookup ${r.status}`))),
-      fetch(`${API}/dnssec?domain=${encodeURIComponent(target)}`).then(r => r.json()).catch(() => null),
-      fetch(`${API}/email?domain=${encodeURIComponent(target)}`).then(r => r.json()).catch(() => null),
+      safeJson(`${API}/lookup?domain=${encodeURIComponent(target)}`),
+      safeJson(`${API}/dnssec?domain=${encodeURIComponent(target)}`),
+      safeJson(`${API}/email?domain=${encodeURIComponent(target)}`),
     ]);
 
-    const recs = (recordRes.results || []).filter(r => (r.records || []).length > 0)
-      .map(r => `<div class="rec"><span class="t">${esc(r.type)}</span>${esc(r.records.map(x => typeof x === 'object' ? JSON.stringify(x) : x).join(' · '))}</div>`)
-      .join('');
-    const noRecs = `<div class="rec dim">No records resolved.</div>`;
+    const entries = (recordRes && recordRes.results) || [];
+    const recLines = [];
+    const failed = [];
+    for (const r of entries) {
+      const recs = r.records || [];
+      if (recs.length > 0) {
+        recLines.push(`<div class="rec"><span class="t">${esc(r.type)}</span>${esc(recs.map(x => typeof x === 'object' ? JSON.stringify(x) : x).join(' · '))}</div>`);
+      } else if (r.error && r.error !== 'ENODATA') {
+        failed.push(`<div class="rec"><span class="t">${esc(r.type)}</span><span class="bad">${esc(r.error)}</span></div>`);
+      }
+    }
+    const noRecs = (entries.length > 0 && recLines.length === 0 && failed.length === 0)
+      ? '<div class="rec dim">No records resolved.</div>'
+      : '';
 
     let dnssecHtml = '';
-    if (dnssecRes) {
-      const signed = dnssecRes.signed === true || dnssecRes.dnssec === true || dnssecRes.has_key === true;
-      const shown = typeof dnssecRes.signed === 'boolean' ? dnssecRes.signed : undefined;
-      if (shown !== undefined) dnssecHtml = `<div class="rec"><span class="${signed ? 'ok' : 'bad'}">${signed ? 'Signed' : 'Not signed'}</span></div>`;
+    if (dnssecRes && dnssecRes._error) {
+      dnssecHtml = `<div class="rec"><span class="bad">check failed (${esc(dnssecRes._error)})</span></div>`;
+    } else {
+      const signed = !!(dnssecRes && (dnssecRes.signed === true || dnssecRes.dnssec === true || dnssecRes.has_key === true));
+      const known = !!(dnssecRes && (dnssecRes.signed !== undefined || dnssecRes.dnssec !== undefined || dnssecRes.has_key !== undefined));
+      if (known) dnssecHtml = `<div class="rec"><span class="${signed ? 'ok' : 'dim'}">${signed ? 'Signed' : 'Not signed'}</span></div>`;
     }
 
     let emailHtml = '';
-    if (emailRes && (emailRes.spf || emailRes.dmarc || emailRes.dkim_domain)) {
-      const chip = (name, v) => v == null ? '' : `<span class="badge">${name}: ${esc(v.status || v.policy || (v.valid ? 'found' : 'none'))}</span> `;
-      emailHtml = `<div class="rec">${chip('SPF', emailRes.spf)}${chip('DKIM', emailRes.dkim_domain)}${chip('DMARC', emailRes.dmarc)}</div>`;
+    if (emailRes && emailRes._error) {
+      emailHtml = `<div class="rec"><span class="bad">check failed (${esc(emailRes._error)})</span></div>`;
+    } else if (emailRes && (emailRes.spf || emailRes.dmarc || emailRes.dkim)) {
+      const chip = (name, state) => state == null ? '' : `<span class="badge">${name}: ${esc(state)}</span> `;
+      const spfState = emailRes.spf ? (emailRes.spf.present ? 'present' : 'none') : null;
+      const dkimState = emailRes.dkim ? ((emailRes.dkim.found || []).length ? `${emailRes.dkim.found.length} selector(s)` : 'none') : null;
+      const dmarcState = emailRes.dmarc ? (emailRes.dmarc.present ? (emailRes.dmarc.policy || 'present') : 'none') : null;
+      emailHtml = `<div class="rec">${chip('SPF', spfState)}${chip('DKIM', dkimState)}${chip('DMARC', dmarcState)}</div>`;
     }
 
     el.out.innerHTML =
-      section('DNS records', recs || noRecs) +
+      section('DNS records', recLines.join('') || noRecs || (failed.length ? '<div class="rec dim">All queries failed — see below.</div>' : '<div class="rec dim">No response.</div>')) +
+      section('Failed checks', failed.length ? failed.join('') : '') +
       section('DNSSEC', dnssecHtml) +
       section('Email auth', emailHtml) +
       `<div class="section"><a href="${SITE}?domain=${encodeURIComponent(target)}&tool=lookup" target="_blank">Open full report →</a></div>`;
   } catch (err) {
-    el.out.innerHTML = `<div class="section"><p class="bad">Failed: ${esc(err.message || 'request error')}</p></div>`;
+    el.out.innerHTML = `<div class="section"><p class="bad">Failed: ${esc((err && err.message) || 'request error')}</p></div>`;
   } finally {
     el.go.disabled = false;
   }
