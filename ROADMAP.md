@@ -2,18 +2,31 @@
 
 Status legend: `idea` → `accepted` → `in progress` → `shipped`.
 
+Scope rule: this repo is the public, free tool. Paid / commercial features
+(watchlists, provider-specific fix recipes, outreach tooling) live in their
+own products — see "Out of scope" at the bottom.
+
 ## Shipped
 
-- **Public API free of charge** — DNS, email-auth (SPF/DKIM/DMARC/BIMI), TLS, WHOIS,
-  reverse, headers, blacklists, DNSSEC, ping, portcheck, probe, traceroute, geoip,
-  MHA parser, speedtest.
+- **Public API free of charge** — DNS, email-auth (SPF/DKIM/DMARC/BIMI), TLS,
+  WHOIS, reverse, headers, blacklists, DNSSEC, ping, portcheck, probe,
+  traceroute, geoip, MHA parser, speedtest.
 - **Static web UI** on GitHub Pages (`/dnstools`).
+- **Browser extension** (MV3): popup quick-check + right-click lookup,
+  deep-links back to the site (`?domain=<d>&tool=<t>`).
+- **Batch mode** — auditor fan-out: up to 10 domains per request, WHOIS facts
+  or full DNS records (`/api/batch`), Turnstile-gated, 4/min/IP.
+- **Compare mode** — diff two domains on WHOIS facts + DNS record sets
+  (`/api/compare`), Turnstile-gated.
+- **Deep links**: `?domain=x.com&tool=whois` auto-runs the right check —
+  used by the extension and shareable.
 - **Metrics + Grafana dashboard** (uptime, req/s, error rate, p95, RSS).
 - **Alerting** to a monitored mailbox: downtime, 5xx rate, p95 breach, restarts,
   memory ceiling, bot pressure.
 - **Abuse controls**: per-IP rate limits, SSRF guards, Cloudflare Turnstile on
-  heavy endpoints, noindex + ai.txt crawler opt-outs.
-- **Feedback plumbing**: issue forms for features/bugs, in-site footer button.
+  heavy endpoints + batch/compare, noindex + ai.txt crawler opt-outs.
+- **Feedback loop**: issue forms for features/bugs, in-site suggestion button,
+  Discussions enabled.
 
 ## Accepted (next)
 
@@ -24,13 +37,17 @@ Status legend: `idea` → `accepted` → `in progress` → `shipped`.
 
 ## Ideas (not started — vote with 👍)
 
-- `idea` — Domain watchlists: get an email when a domain's TTL/records/cert
-  change (rate-limited, anonymous).
-- `idea` — DNS provider "misconfig recipes": auto-generated fix instructions
-  per provider (Cloudflare/Route53/GoDaddy).
-- `idea` — Browser extension: hover any domain anywhere → quick lookup panel.
-- `idea` — Batch mode: check up to 10 domains per request for auditors.
-- `idea` — Compare mode: diff two domains side by side.
+- `idea` — Provider-aware propagation hints: when a record disagrees across
+  resolvers, link to the relevant registrar/CF docs page.
+- `idea` — Blacklist delisting guide per DNSBL.
 
-> Want something here? Open a feature request via the in-site
-> **Suggest an improvement** button or the repo's issue templates.
+## Out of scope (owned by other products — do NOT build here)
+
+- **Domain change watchlists / monitoring** → Brand Protection
+  (brandprotection.segbytes.co.za) — paid service, separate project.
+- **DNS provider "misconfig recipes" + provider integrations** → also
+  Brand Protection.
+- **Contextual affiliate / partner offers inside results** → Brand Protection.
+- **Prospect / lead-gen workflows on top of checks** → Nexus Prospects.
+- **DMARC aggregate-report monitoring + industry data reports** → Nullapart
+  (DMARC feature).

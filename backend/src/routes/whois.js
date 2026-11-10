@@ -84,3 +84,4 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 module.exports = router;
+module.exports.cachedWhois = cached;

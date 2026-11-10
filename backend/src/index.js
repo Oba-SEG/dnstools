@@ -36,11 +36,14 @@ app.use(helmet({
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3001,http://localhost:3002,http://localhost:3003').split(',').map(s => s.trim()).filter(Boolean);
 // On Render, the platform injects the service URL — self-allow it too.
 if (process.env.RENDER_EXTERNAL_URL) ALLOWED_ORIGINS.push(process.env.RENDER_EXTERNAL_URL.replace(/\/$/, ''));
+// Browser extensions send a chrome-extension://… / moz-extension://… origin
+// (opaque-ish but stable per install) — public endpoints stay public to them.
+const EXTENSION_ORIGIN = /^(chrome-extension|moz-extension|safari-web-extension|extension):\/\//i;
 app.use(cors({
   origin: (origin, cb) => {
     // Allow same-origin / curl / direct API
     if (!origin) return cb(null, true);
-    if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*') || EXTENSION_ORIGIN.test(origin)) return cb(null, true);
     return cb(null, false);
   },
   credentials: false,
@@ -139,6 +142,10 @@ app.use('/api/geoip', lookupLimiter, require('./routes/geoip'));
 app.use('/api/mha', lookupLimiter, express.json({ limit: '256kb' }), require('./routes/mha'));
 // T3 — speed test diagnostics (higher limit: ~22 requests per test run)
 app.use('/api/speedtest', speedtestLimiter, require('./routes/speedtest'));
+// Auditor tools — batch fans one request out over N targets, so it gets its
+// own tighter limiter and rides the heavy-endpoint Turnstile gate.
+app.use('/api/batch', requireTurnstile(), require('./routes/batch'));
+app.use('/api/compare', heavyLimiter, requireTurnstile(), require('./routes/compare'));
 
 // 404 for anything else
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
