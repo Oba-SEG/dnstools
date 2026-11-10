@@ -33,6 +33,8 @@ app.use(helmet({
 
 // CORS: allow the frontend origin and a small list of dev origins.
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3001,http://localhost:3002,http://localhost:3003').split(',').map(s => s.trim()).filter(Boolean);
+// On Render, the platform injects the service URL — self-allow it too.
+if (process.env.RENDER_EXTERNAL_URL) ALLOWED_ORIGINS.push(process.env.RENDER_EXTERNAL_URL.replace(/\/$/, ''));
 app.use(cors({
   origin: (origin, cb) => {
     // Allow same-origin / curl / direct API

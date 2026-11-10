@@ -90,6 +90,25 @@ The frontend reads `NEXT_PUBLIC_API_URL` at build time (default
 
 ## Deploy
 
+### Backend on Render (free)
+
+One-click blueprint deploy of the Dockerised API to a free Render web
+service (`*.onrender.com`, spins down after 15 min idle ~ 1 min wake):
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Oba-SEG/dnstools)
+
+After the deploy completes, set `NEXT_PUBLIC_API_URL` under the repo's
+GitHub → Settings → Secrets and variables → Actions → Variables to
+`https://<service-name>.onrender.com/api`, then rerun the
+`deploy-pages.yml` workflow to rebuild the frontend.
+
+For local development, docker compose brings up api + web + prometheus:
+
+```bash
+docker compose up -d --build
+# api → :4001, web → :3002, prometheus → :9090
+```
+
 The reference deployment runs both processes on the same VM behind nginx
 with PM2. `dns.segbytes.co.za` proxies `/api/*` to the backend (port 4001)
 and everything else to the Next.js frontend (port 3001).
