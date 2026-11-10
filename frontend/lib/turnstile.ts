@@ -4,28 +4,31 @@
 //
 // Design:
 // - The script loads lazily on the first gated call (zero cost otherwise).
-// - One managed widget (interaction-only appearance) is rendered once into
-//   a fixed container; each gated call executes it to mint a fresh token.
-//   Tokens are single-use server-side, so nothing is cached.
-// - Executes are serialized through a promise chain — the widget can only
-//   mint one token at a time.
-// - Any failure (script load, widget error, expiry timeout) resolves null;
-//   caller then sends the request without the header and the backend's
-//   clear 400 message surfaces in the UI.
+// - One managed widget (execution:'execute', interaction-only appearance)
+//   is rendered once into a visible bottom-center container.
+// - Each gated call mints a fresh token by executing the widget; tokens
+//   are single-use server-side, so nothing is cached.
+// - Executes are serialized through a promise chain — one token at a time.
+// - The container is shown while a challenge is pending and hidden when
+//   done — if Cloudflare decides this session needs an interactive check,
+//   the checkbox is fully visible and clickable (never clipped).
+// - Any failure (script load, widget error, grace timeout) resolves null;
+//   the caller then sends the request without the header and the
+//   backend's clear 400 message surfaces in the UI.
 // - If NEXT_PUBLIC_TURNSTILE_SITE_KEY is unset (local dev / LAN backend),
 //   protection is off: resolve null immediately.
 
 const SITEKEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-const GRACE_TIMEOUT_MS = 15_000;
+const GRACE_TIMEOUT_MS = 20_000;
 
 interface TurnstileApi {
-  ready: (cb: () => void) => void;
+  ready?: (cb: () => void) => void;
   render: (el: HTMLElement, opts: Record<string, unknown>) => string;
   execute: (id: string) => void;
+  reset: (id?: string) => void;
   remove: (id: string) => void;
   getResponse: (id: string) => string;
-  reset: (id?: string) => void;
 }
 
 declare global {
@@ -39,21 +42,23 @@ let widgetId: string | null = null;
 let containerEl: HTMLElement | null = null;
 let loading: Promise<TurnstileApi> | null = null;
 let chain: Promise<string | null> = Promise.resolve(null);
+// Resolver for the mint currently in flight. Executes are serialized, so
+// at most one is ever pending.
+let pendingResolve: ((t: string | null) => void) | null = null;
 
 function loadScript(): Promise<TurnstileApi> {
-  const w = window;
-  const existing = w.turnstile && containerEl ? Promise.resolve(w.turnstile) : null;
-  if (existing) return existing;
+  if (window.turnstile) return Promise.resolve(window.turnstile);
   if (loading) return loading;
 
   loading = new Promise<TurnstileApi>((resolve, reject) => {
+    const w = window;
     if (w.turnstile) return resolve(w.turnstile);
     w.__tsOnload = () => {
       if (!w.turnstile) { reject(new Error("turnstile: api loaded but object missing")); return; }
       resolve(w.turnstile);
     };
     const s = document.createElement("script");
-    s.src = `${SCRIPT_SRC}?onload=__tsOnload&render=explicit`;
+    s.src = `${SCRIPT_SRC}?onload=__tsOnload`;
     s.async = true;
     s.onerror = () => reject(new Error("turnstile: failed to load script"));
     document.head.appendChild(s);
@@ -65,19 +70,35 @@ function ensureContainer(): HTMLElement {
   if (containerEl && document.documentElement.contains(containerEl)) return containerEl;
   containerEl = document.createElement("div");
   containerEl.setAttribute("data-ndns-turnstile", "");
+  // Never clipped: if the challenge needs a click, it must be fully
+  // visible and clickable. Hidden by default; shown while minting.
   containerEl.style.cssText =
-    "position:fixed;left:50%;bottom:10px;transform:translateX(-50%);width:300px;max-height:65px;overflow:hidden;z-index:2147483000;";
+    "position:fixed;left:50%;bottom:14px;transform:translateX(-50%);" +
+    "z-index:2147483000;background:#0b0e17;border:1px solid rgba(255,255,255,.12);" +
+    "border-radius:14px;padding:10px;box-shadow:0 10px 40px rgba(0,0,0,.55);" +
+    "display:none;";
   document.body.appendChild(containerEl);
   return containerEl;
 }
 
-function renderWidget(ts: TurnstileApi, onToken: (t: string) => void, onError: (e: string) => void): string {
-  widgetId = ts.render(ensureContainer(), {
+function renderWidget(ts: TurnstileApi): string {
+  containerEl = ensureContainer();
+  widgetId = ts.render(containerEl, {
     sitekey: SITEKEY,
     appearance: "interaction-only",
-    callback: onToken,
-    "error-callback": (code: string) => onError(code),
-    "expired-callback": () => onError("expired"),
+    execution: "execute",
+    callback: (token: string) => {
+      const r = pendingResolve; pendingResolve = null;
+      if (r) r(token);
+    },
+    "error-callback": () => {
+      const r = pendingResolve; pendingResolve = null;
+      if (r) r(null);
+      if (widgetId !== null) { try { ts.reset(widgetId); } catch { /* noop */ } }
+    },
+    "expired-callback": () => {
+      if (widgetId !== null) { try { ts.reset(widgetId); } catch { /* noop */ } }
+    },
   });
   return widgetId;
 }
@@ -89,19 +110,28 @@ function mintOnce(): Promise<string | null> {
   const next = chain.then(() =>
     new Promise<string | null>((resolve) => {
       let settled = false;
+      const hide = () => { if (widgetId !== null) ensureContainer().style.display = "none"; };
       const done = (t: string | null) => {
         if (!settled) { settled = true; resolve(t); }
+        hide();
       };
       const grace = setTimeout(() => done(null), GRACE_TIMEOUT_MS);
 
       loadScript()
         .then((ts) => {
-          const id = widgetId ?? renderWidget(ts, (tok) => { clearTimeout(grace); done(tok); }, () => { clearTimeout(grace); done(null); });
-          if (id === null) { clearTimeout(grace); done(null); return; }
-          // Re-executing an already-rendered widget mints a fresh token.
+          // Commit to showing the container BEFORE any challenge starts,
+          // so an interaction-required flow can never stay invisible.
+          containerEl = ensureContainer();
+          containerEl.style.display = "flex";
+          if (widgetId === null) renderWidget(ts);
+          pendingResolve = (t) => {
+            clearTimeout(grace);
+            done(t);
+          };
           try {
-            ts.execute(id);
+            ts.execute(widgetId as string);
           } catch {
+            pendingResolve = null;
             clearTimeout(grace);
             done(null);
           }
