@@ -1,0 +1,53 @@
+services:
+  ndns-api:
+    build: ./backend
+    container_name: nexus-dns-api
+    environment:
+      NODE_ENV: production
+      PORT: "4001"
+      ALLOWED_ORIGINS: "http://192.168.8.4:3002,http://localhost:3002,http://192.168.8.201:3002,https://dns.segbytes.co.za"
+    ports:
+      - "4001:4001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  ndns-web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://192.168.8.4:4001/api}
+    container_name: nexus-dns-web
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+    ports:
+      - "3002:3001"
+    depends_on:
+      ndns-api:
+        condition: service_healthy
+    restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v3
+    container_name: nexus-dns-prometheus
+    user: "0"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus-data
+      - --storage.tsdb.retention.time=7d
+      - --web.listen-address=0.0.0.0:9090
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./grafana_key:/etc/prometheus/grafana_key:ro
+      - prometheus_data:/prometheus-data
+    ports:
+      - "9090:9090"
+    depends_on:
+      ndns-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:

@@ -19,6 +19,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const metrics = require('./lib/metrics');
 
 const app = express();
 app.set('trust proxy', 1); // we sit behind nginx in production
@@ -89,7 +90,9 @@ const speedtestLimiter = rateLimit({
 });
 
 // --- Routes ---
+app.use(metrics.middleware);
 app.get('/health', (req, res) => res.json({ ok: true, service: 'nexus-dns', uptime_s: Math.round(process.uptime()) }));
+app.get('/metrics', (req, res) => { res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8'); res.send(metrics.metricsText()); });
 
 app.use('/api/lookup', lookupLimiter, require('./routes/lookup'));
 app.use('/api/propagation', heavyLimiter, require('./routes/propagation'));

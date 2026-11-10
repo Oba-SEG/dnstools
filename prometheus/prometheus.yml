@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: nexus-dns-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["ndns-api:4001"]
+    relabel_configs:
+      - target_label: app
+        replacement: nexus-dns
+
+remote_write:
+  - url: https://prometheus-prod-55-prod-gb-south-1.grafana.net/api/prom/push
+    basic_auth:
+      username: "3752346"
+      password_file: /etc/prometheus/grafana_key
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 4
+      capacity: 2500

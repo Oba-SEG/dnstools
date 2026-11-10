@@ -31,3 +31,8 @@ secrets.*
 # Caches
 .cache/
 *.tsbuildinfo
+
+# Credentials — tokens live only on deployment hosts
+grafana_key
+*.token
+tokens/

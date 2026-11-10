@@ -1119,7 +1119,16 @@ function SpeedTestView({ data }: { data: any }) {
       });
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
       const d = await res.json();
-      if (d.shareUrl) setShareUrl(window.location.origin + d.shareUrl);
+      if (d.shareUrl) {
+        const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
+        const BASE = STATIC_EXPORT ? "/dnstools" : "";
+        let path = d.shareUrl as string;
+        if (STATIC_EXPORT && path.startsWith("/speedtest/")) {
+          const sid = path.slice("/speedtest/".length).replace(/\/$/, "");
+          path = `/speedtest/_/?id=${encodeURIComponent(sid)}`;
+        }
+        setShareUrl(window.location.origin + BASE + path);
+      }
     } catch (e: any) {
       console.error("Speed test save failed:", e);
       setSaveError(e?.message || "Failed to save result");
