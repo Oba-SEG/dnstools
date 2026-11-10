@@ -1,4 +1,5 @@
 # CodeRabbit review config for Oba-SEG/dnstools
+# Head branch for a one-shot full review of everything since 66b4bab.
 # Keep reviews focused on source; lockfiles and bundles are machine-generated.
 reviews:
   path_filters:
