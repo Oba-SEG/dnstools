@@ -20,6 +20,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const metrics = require('./lib/metrics');
+const { requireTurnstile } = require('./lib/turnstile');
 
 const app = express();
 app.set('trust proxy', 1); // we sit behind nginx in production
@@ -93,23 +94,47 @@ const speedtestLimiter = rateLimit({
 
 // --- Routes ---
 app.use(metrics.middleware);
+
+// --- Crawler / AI guidance ---
+// This is an interactive API, not a content site: disallow all crawlers on
+// the API plus a machine-readable opt-out for AI/LLM scrapers (ai.txt).
+// Heavy endpoints are additionally protected by Turnstile (inert until
+// TURNSTILE_SECRET_KEY is configured).
+app.use('/api', (req, res, next) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  next();
+});
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').send(
+    'User-agent: *\nDisallow: /\n'
+  );
+});
+app.get('/ai.txt', (req, res) => {
+  res.type('text/plain').send(
+    '# ai.txt - machine-readable permissions for AI/LLM crawlers\n' +
+    'User-agent: *\nExt: none\nPermission: deny-all\n\n' +
+    '# This host provides an interactive diagnostics API. Automated bulk\n' +
+    '# collection and the use of this service\'s output for training or\n' +
+    '# dataset construction are not permitted.\n'
+  );
+});
 app.get('/health', (req, res) => res.json({ ok: true, service: 'nexus-dns', uptime_s: Math.round(process.uptime()) }));
 app.get('/metrics', (req, res) => { res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8'); res.send(metrics.metricsText()); });
 
 app.use('/api/lookup', lookupLimiter, require('./routes/lookup'));
-app.use('/api/propagation', heavyLimiter, require('./routes/propagation'));
+app.use('/api/propagation', heavyLimiter, requireTurnstile(), require('./routes/propagation'));
 app.use('/api/email', lookupLimiter, require('./routes/email'));
-app.use('/api/tls', heavyLimiter, require('./routes/tls'));
-app.use('/api/whois', heavyLimiter, require('./routes/whois'));
+app.use('/api/tls', heavyLimiter, requireTurnstile(), require('./routes/tls'));
+app.use('/api/whois', heavyLimiter, requireTurnstile(), require('./routes/whois'));
 app.use('/api/reverse', lookupLimiter, require('./routes/reverse'));
-app.use('/api/headers', heavyLimiter, require('./routes/headers'));
-app.use('/api/blacklist', heavyLimiter, require('./routes/blacklist'));
+app.use('/api/headers', heavyLimiter, requireTurnstile(), require('./routes/headers'));
+app.use('/api/blacklist', heavyLimiter, requireTurnstile(), require('./routes/blacklist'));
 app.use('/api/dnssec', lookupLimiter, require('./routes/dnssec'));
 // T2 — ping.pe-style network diagnostics
-app.use('/api/ping', heavyLimiter, require('./routes/ping'));
-app.use('/api/portcheck', heavyLimiter, require('./routes/portcheck'));
-app.use('/api/probe', heavyLimiter, require('./routes/probe'));
-app.use('/api/traceroute', heavyLimiter, require('./routes/traceroute'));
+app.use('/api/ping', heavyLimiter, requireTurnstile(), require('./routes/ping'));
+app.use('/api/portcheck', heavyLimiter, requireTurnstile(), require('./routes/portcheck'));
+app.use('/api/probe', heavyLimiter, requireTurnstile(), require('./routes/probe'));
+app.use('/api/traceroute', heavyLimiter, requireTurnstile(), require('./routes/traceroute'));
 app.use('/api/geoip', lookupLimiter, require('./routes/geoip'));
 app.use('/api/mha', lookupLimiter, express.json({ limit: '256kb' }), require('./routes/mha'));
 // T3 — speed test diagnostics (higher limit: ~22 requests per test run)
