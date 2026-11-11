@@ -5,7 +5,7 @@ import { Check, Download, FileText, GitBranch, ListChecks, Lock, Minus, Monitor,
 
 // Swap these when the LemonSqueezy product goes live; leave BUY_URL empty
 // to show the "sales open soon" state.
-const BUY_URL = "";
+const BUY_URL = "https://segbytes.lemonsqueezy.com/checkout/buy/54596647-6093-4a8d-a787-63c3e2301c39";
 const PRICE = "$79";
 
 const FEATURES = [
@@ -120,7 +120,8 @@ export default function ProSalesPage() {
         </div>
         <p className="text-[11px] text-muted-foreground mt-4 text-center leading-relaxed">
           {PRICE} one-time · perpetual license · one deployment per license · the free public tools
-          stay free and anonymous, always. Sales handled by our merchant of record; taxes included at checkout.
+          stay free and anonymous, always. Sales handled by our merchant of record (Lemon Squeezy);
+          taxes included at checkout. Your license key is emailed right after purchase.
         </p>
       </section>
 
