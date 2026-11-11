@@ -14,6 +14,34 @@ const { asyncHandler } = require('../lib/asyncHandler');
 
 const router = express.Router();
 
+// node:dns's Resolver rejects DNSKEY/DS rrtypes (ERR_INVALID_ARG_VALUE), so
+// DNSSEC record lookups go over the JSON DoH API instead — trusted,
+// validating resolvers only, same SSRF stance as the rest of the API (the
+// queried name is always a validated domain, never user-controlled infra).
+const DOH_ENDPOINTS = [
+  'https://cloudflare-dns.com/dns-query',
+  'https://dns.google/resolve',
+];
+
+async function dohQuery(name, type) {
+  let lastErr;
+  for (const endpoint of DOH_ENDPOINTS) {
+    try {
+      const res = await fetch(`${endpoint}?name=${encodeURIComponent(name)}&type=${type}`, {
+        headers: { accept: 'application/dns-json' },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!res.ok) throw new Error(`DoH HTTP ${res.status}`);
+      const body = await res.json();
+      if (body.Status !== 0) throw new Error(`DoH status ${body.Status}`);
+      return Array.isArray(body.Answer) ? body.Answer : [];
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('DoH failed');
+}
+
 async function checkDnssec(domain) {
   const resolver = new dns.Resolver({ timeout: 5000, tries: 2 });
   resolver.setServers(['1.1.1.1', '8.8.8.8']); // both validating resolvers
@@ -21,13 +49,13 @@ async function checkDnssec(domain) {
   // DNSKEY records at the apex
   let dnskey = [];
   try {
-    dnskey = await resolver.resolve(domain, 'DNSKEY').catch(() => []);
+    dnskey = await dohQuery(domain, 'DNSKEY').catch(() => []);
   } catch { /* no-op */ }
 
   // DS records at the parent zone
   let ds = [];
   try {
-    ds = await resolver.resolve(domain, 'DS').catch(() => []);
+    ds = await dohQuery(domain, 'DS').catch(() => []);
   } catch { /* no-op */ }
 
   // Heuristic: if a validating resolver returns answers without SERVFAIL,
@@ -69,3 +97,5 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 module.exports = router;
+module.exports.checkDnssec = checkDnssec;
+module.exports.cachedCheck = cached;
