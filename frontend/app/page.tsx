@@ -233,7 +233,7 @@ export default function Home() {
       </header>
 
       {/* Hero */}
-      <section className="container mx-auto px-6 pt-14 pb-8">
+      <section className="container mx-auto px-6 pt-10 sm:pt-14 pb-8">
         <div className="text-center max-w-xl mx-auto mb-8">
           <p className="text-[10px] uppercase tracking-[0.2em] text-orange-400/80 font-bold mb-3">DNS · Email · TLS · WHOIS · Network</p>
           <h2 className="font-display text-3xl sm:text-[2.5rem] font-bold tracking-tighter leading-[1.1] mb-3">
@@ -277,8 +277,8 @@ export default function Home() {
       {/* Tabs */}
       {(submitted || (tab as TabKey) !== "lookup" || tab === "mha") && (
         <section className="container mx-auto px-6">
-          <div className="overflow-x-auto -mx-2 px-2">
-            <div className="flex gap-2 pb-2 min-w-max">
+          <div className="overflow-x-auto -mx-2 px-2 [scrollbar-width:none] [-ms-overflow-style:none] snap-x">
+            <div className="flex gap-2 pb-2 min-w-max [&::-webkit-scrollbar]:hidden">
               {TABS.map((t) => {
                 const active = t.key === tab;
                 const Icon = t.icon;
@@ -348,7 +348,7 @@ export default function Home() {
           </div>
         )}
         {!submitted && tab === "lookup" && (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
             {TABS.map((t) => {
               const Icon = t.icon;
               return (
@@ -364,11 +364,11 @@ export default function Home() {
                       document.querySelector<HTMLInputElement>('input[placeholder*="example.com"]')?.focus();
                     }
                   }}
-                  className="premium-surface premium-card rounded-xl p-4 text-left cursor-pointer"
+                  className="premium-surface premium-card rounded-xl p-3.5 sm:p-4 text-left cursor-pointer"
                 >
                   <Icon className="w-4 h-4 text-orange-400 mb-2" />
                   <p className="font-display font-bold text-xs tracking-tight mb-0.5">{t.label}</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">{t.desc}</p>
+                  <p className="hidden sm:block text-[11px] text-muted-foreground leading-relaxed">{t.desc}</p>
                 </button>
               );
             })}
