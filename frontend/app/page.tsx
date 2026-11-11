@@ -277,8 +277,8 @@ export default function Home() {
       {/* Tabs */}
       {(submitted || (tab as TabKey) !== "lookup" || tab === "mha") && (
         <section className="container mx-auto px-6">
-          <div className="overflow-x-auto -mx-2 px-2 [scrollbar-width:none] [-ms-overflow-style:none] snap-x">
-            <div className="flex gap-2 pb-2 min-w-max [&::-webkit-scrollbar]:hidden">
+          <div className="overflow-x-auto -mx-2 px-2 snap-x">
+            <div className="flex gap-2 pb-2 min-w-max">
               {TABS.map((t) => {
                 const active = t.key === tab;
                 const Icon = t.icon;
@@ -368,7 +368,7 @@ export default function Home() {
                 >
                   <Icon className="w-4 h-4 text-orange-400 mb-2" />
                   <p className="font-display font-bold text-xs tracking-tight mb-0.5">{t.label}</p>
-                  <p className="hidden sm:block text-[11px] text-muted-foreground leading-relaxed">{t.desc}</p>
+                  <p className="block line-clamp-2 sm:line-clamp-none text-[11px] text-muted-foreground leading-relaxed">{t.desc}</p>
                 </button>
               );
             })}

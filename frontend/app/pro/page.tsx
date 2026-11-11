@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Check, Download, FileText, GitBranch, ListChecks, Lock, Minus, Monitor, X } from "lucide-react";
 
 // Swap these when the LemonSqueezy product goes live; leave BUY_URL empty
@@ -27,7 +28,8 @@ const COMPARE: { label: string; free: string | boolean; pro: string | boolean }[
   { label: "Client-ready PDF reports", free: false, pro: true },
   { label: "Change monitoring + diffs", free: false, pro: true },
   { label: "Grafana dashboards", free: false, pro: true },
-  { label: "Accounts, cookies, tracking", free: false, pro: false },
+  { label: "Accounts and cookies", free: false, pro: false },
+  { label: "Privacy-friendly aggregate analytics", free: true, pro: true },
 ];
 
 export default function ProSalesPage() {
@@ -38,12 +40,12 @@ export default function ProSalesPage() {
     <main className="min-h-screen bg-[#060810]">
       <header className="border-b border-white/[0.04] bg-[#060810]/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="container mx-auto px-6 py-3.5 flex items-center gap-2.5">
-          <a href="/dnstools/" className="flex items-center gap-2.5 group">
+          <Link href="/" className="flex items-center gap-2.5 group">
             <div className="ndns-mark w-8 h-8 text-[12px]">N</div>
             <h1 className="text-[14px] font-display font-bold tracking-tight text-foreground/90">Nexus DNS</h1>
-          </a>
+          </Link>
           <span className="text-[9px] uppercase tracking-widest text-orange-400/80 border border-orange-500/20 rounded-full px-2 py-0.5">Pro</span>
-          <a href="/dnstools/" className="ml-auto text-[11px] text-muted-foreground hover:text-orange-300 transition-colors">← Free tools</a>
+          <Link href="/" className="ml-auto text-[11px] text-muted-foreground hover:text-orange-300 transition-colors">← Free tools</Link>
         </div>
       </header>
 
@@ -106,13 +108,13 @@ export default function ProSalesPage() {
                 <tr key={row.label}>
                   <td className="py-2.5 pr-4">{row.label}</td>
                   <td className="py-2.5 pr-4">
-                    {row.free === true ? <Check className="w-4 h-4 text-emerald-400" /> :
-                     row.free === false ? <Minus className="w-4 h-4 text-muted-foreground/40" /> :
+                    {row.free === true ? (<><Check aria-hidden="true" className="w-4 h-4 text-emerald-400" /><span className="sr-only">Yes</span></>) :
+                     row.free === false ? (<><Minus aria-hidden="true" className="w-4 h-4 text-muted-foreground/40" /><span className="sr-only">No</span></>) :
                      <span className="text-[12px] text-muted-foreground">{row.free}</span>}
                   </td>
                   <td className="py-2.5">
-                    {row.pro === true ? <Check className="w-4 h-4 text-orange-400" /> :
-                     row.pro === false ? <X className="w-4 h-4 text-muted-foreground/40" /> :
+                    {row.pro === true ? (<><Check aria-hidden="true" className="w-4 h-4 text-orange-400" /><span className="sr-only">Yes</span></>) :
+                     row.pro === false ? (<><X aria-hidden="true" className="w-4 h-4 text-muted-foreground/40" /><span className="sr-only">No</span></>) :
                      <span className="text-[12px] text-orange-300">{row.pro}</span>}
                   </td>
                 </tr>
@@ -123,7 +125,9 @@ export default function ProSalesPage() {
         <p className="text-[11px] text-muted-foreground mt-4 text-center leading-relaxed">
           {PRICE} one-time · perpetual license · one deployment per license · the free public tools
           stay free and anonymous, always. Sales handled by our merchant of record (Lemon Squeezy);
-          taxes included at checkout. Your license key is emailed right after purchase.
+          taxes included at checkout. Right after payment, Lemon Squeezy hands you off to the
+          {" "}<Link href="/pro/redeem" className="text-orange-300 underline hover:text-orange-200">redemption page</Link>,
+          where your license key appears instantly — no waiting on email.
         </p>
       </section>
 
@@ -131,8 +135,8 @@ export default function ProSalesPage() {
         <div className="container mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest">Nexus DNS · Free · No login · No data stored</p>
           <div className="flex items-center gap-4 text-[10px] uppercase tracking-widest text-muted-foreground/60">
-            <a href="/dnstools/privacy" className="hover:text-orange-300 transition-colors">Privacy</a>
-            <a href="/dnstools/terms" className="hover:text-orange-300 transition-colors">Terms</a>
+            <Link href="/privacy" className="hover:text-orange-300 transition-colors">Privacy</Link>
+            <Link href="/terms" className="hover:text-orange-300 transition-colors">Terms</Link>
           </div>
         </div>
       </footer>

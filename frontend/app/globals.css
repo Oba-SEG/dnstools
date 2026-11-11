@@ -146,8 +146,9 @@
 
   /* Consistent keyboard focus everywhere */
   *:focus-visible {
-    outline: 2px solid rgba(249, 115, 22, 0.7);
-    outline-offset: 2px;
+    /* !important so utility classes like focus:outline-none cannot mute the ring */
+    outline: 2px solid rgba(249, 115, 22, 0.7) !important;
+    outline-offset: 2px !important;
   }
 
   /* Respect reduced-motion preferences */
