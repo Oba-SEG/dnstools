@@ -88,12 +88,6 @@ export default function DomainOverviewClient({ pathDomain }: { pathDomain?: stri
     pushRecent(domain);
 
     (async () => {
-    const ts = await getTurnstileToken();
-    const heavyHeaders: Record<string, string> = {};
-    if (ts.token) {
-      heavyHeaders["x-turnstile-token"] = ts.token;
-    }
-
     const fetchCard = async (key: CardKey, url: string, headers?: Record<string, string>) => {
       try {
         const res = await fetch(url, { headers });
@@ -110,12 +104,27 @@ export default function DomainOverviewClient({ pathDomain }: { pathDomain?: stri
       }
     };
 
-    const light: [CardKey, string][] = [
+    // Tokens are single-use — every gated call mints its own, matching the
+    // landing flow. Mints are serialized inside lib/turnstile.
+    const heavy = async (key: CardKey, url: string) => {
+      const ts = await getTurnstileToken();
+      if (!ts.token) {
+        setCard(key, {
+          status: "done",
+          data: undefined,
+          error: `Security check didn't complete (${ts.reason}). Reload the page and try again.`,
+        });
+        return null;
+      }
+      return fetchCard(key, url, { "x-turnstile-token": ts.token });
+    };
+
+    const gated: [CardKey, string][] = [
       ["whois", `${API}/whois?domain=${encodeURIComponent(domain)}`],
       ["tls", `${API}/tls?domain=${encodeURIComponent(domain)}`],
       ["headers", `${API}/headers?domain=${encodeURIComponent(domain)}`],
     ];
-    for (const [key, url] of light) fetchCard(key, url, heavyHeaders);
+    for (const [key, url] of gated) await heavy(key, url);
 
     const free: [CardKey, string][] = [
       ["email", `${API}/email?domain=${encodeURIComponent(domain)}`],
@@ -129,7 +138,7 @@ export default function DomainOverviewClient({ pathDomain }: { pathDomain?: stri
         setCard("blacklist", { status: "done", data: null });
         return;
       }
-      await fetchCard("blacklist", `${API}/blacklist?ip=${encodeURIComponent(aRecord)}`, heavyHeaders);
+      await heavy("blacklist", `${API}/blacklist?ip=${encodeURIComponent(aRecord)}`);
     })();
   }, [domain]);
 
