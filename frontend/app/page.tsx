@@ -207,10 +207,10 @@ export default function Home() {
       {/* Top bar */}
       <header className="border-b border-white/[0.04] bg-[#060810]/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="container mx-auto px-6 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="ndns-mark w-8 h-8 text-[12px]">N</div>
-            <h1 className="text-[14px] font-display font-bold tracking-tight text-foreground/90">Nexus Domain Tools</h1>
-          </div>
+          <a href={`${BASE}/`} title="Back to start" className="flex items-center gap-2.5 group">
+            <div className="ndns-mark w-8 h-8 text-[12px] group-hover:opacity-80 transition-opacity">N</div>
+            <h1 className="text-[14px] font-display font-bold tracking-tight text-foreground/90 group-hover:text-orange-300 transition-colors">Nexus Domain Tools</h1>
+          </a>
           <div className="flex items-center gap-4">
             <button
               onClick={() => window.dispatchEvent(new Event("ndns-open-palette"))}
