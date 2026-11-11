@@ -7,14 +7,18 @@
 //   visible bottom-center container (never clipped — if Cloudflare decides
 //   an interactive check is needed, the checkbox stays clickable).
 // - Each gated call executes the widget for a fresh single-use token.
-//   Executes are serialized: one mint at a time.
+//   Executes are serialized: one mint at a time. One automatic retry per
+//   mint — Turnstile challenges occasionally fail or escalate silently,
+//   and back-to-back mints (e.g. the domain overview) amplify that.
 // - Failures never throw: { token: null, reason } so the UI can explain.
 // - With NEXT_PUBLIC_TURNSTILE_SITE_KEY unset (local dev / LAN) the gate
 //   is off: { token: null, reason: 'no-sitekey' }.
 
 const SITEKEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-const GRACE_TIMEOUT_MS = 20_000;
+const GRACE_TIMEOUT_MS = 30_000;
+const RETRY_GAP_MS = 400;
+const RETRYABLE = /^(widget-error|no-solve-timeout|execute-threw|widget-no-solve|script-)/;
 
 interface TurnstileApi {
   render: (el: HTMLElement, opts: Record<string, unknown>) => string;
@@ -99,7 +103,20 @@ function renderWidget(ts: TurnstileApi): string {
 }
 
 function mintOnce(): Promise<TurnstileResult> {
-  const next = chain.then(() => new Promise<TurnstileResult>((resolve) => {
+  const next = chain.then(async () => {
+    let r = await attempt();
+    if (!r.token && RETRYABLE.test(r.reason)) {
+      await new Promise(res => setTimeout(res, RETRY_GAP_MS));
+      r = await attempt();
+    }
+    return r;
+  });
+  chain = next.then(() => ({ token: null, reason: "idle" }));
+  return next;
+}
+
+function attempt(): Promise<TurnstileResult> {
+  return new Promise<TurnstileResult>((resolve) => {
     let settled = false;
     const hide = () => { if (widgetId !== null) ensureContainer().style.display = "none"; };
     const done = (token: string | null, reason: string) => {
@@ -115,14 +132,16 @@ function mintOnce(): Promise<TurnstileResult> {
         containerEl = ensureContainer();
         containerEl.style.display = "flex";
         if (widgetId === null) renderWidget(ts);
-        // Turnstile widgets are one-shot: an already-solved widget ignores
-        // a bare execute(). Reset it so every mint gets a fresh challenge.
-        try { ts.reset(widgetId as string); } catch { /* first run: nothing to reset */ }
+        // Assign the pending resolver before reset: a reset() can fire the
+        // error-callback synchronously, and that failure must reach the
+        // mint (and its retry) instead of being swallowed.
         pendingResolve = (t, reason) => {
           clearTimeout(grace);
           if (t) done(t, "ok");
           else done(null, reason || "widget-no-solve");
         };
+        try { ts.reset(widgetId as string); } catch { /* first run: nothing to reset */ }
+        if (settled) return; // reset surfaced an error — let the retry handle it
         try {
           ts.execute(widgetId as string);
         } catch {
@@ -132,9 +151,7 @@ function mintOnce(): Promise<TurnstileResult> {
         }
       })
       .catch((e: Error) => { clearTimeout(grace); done(null, `script-${e.message}`); });
-  }));
-  chain = next.then(() => ({ token: null, reason: "idle" }));
-  return next;
+  });
 }
 
 export async function getTurnstileToken(): Promise<TurnstileResult> {
