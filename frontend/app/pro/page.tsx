@@ -5,7 +5,9 @@ import { Check, Download, FileText, GitBranch, ListChecks, Lock, Minus, Monitor,
 
 // Swap these when the LemonSqueezy product goes live; leave BUY_URL empty
 // to show the "sales open soon" state.
-const BUY_URL = "https://segbytes.lemonsqueezy.com/checkout/buy/54596647-6093-4a8d-a787-63c3e2301c39";
+// Custom checkout (API-created): same product/price, but the success redirect
+// lands the buyer on /pro/redeem to claim their license instantly.
+const BUY_URL = "https://segbytes.lemonsqueezy.com/checkout/custom/c77c6cb9-823c-46ef-86d1-6399178168d4?signature=bb5059a9464a4eaf175aeae2e1bfe4e541076c2891df2dd628ee7f384a1f01f1";
 const PRICE = "$79";
 
 const FEATURES = [
