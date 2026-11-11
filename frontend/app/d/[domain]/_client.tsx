@@ -8,6 +8,7 @@ import {
 import {
   VerdictCard, pushRecent, RecentsStrip,
 } from "@/components/verdict";
+import { getTurnstileToken } from "@/lib/turnstile";
 import {
   blacklistVerdict, cleanDomain, dnsVerdict, dnssecVerdict, emailVerdict,
   headersVerdict, isDomainish, tlsVerdict, whoisVerdict,
@@ -86,9 +87,16 @@ export default function DomainOverviewClient({ pathDomain }: { pathDomain?: stri
     if (!domain) return;
     pushRecent(domain);
 
-    const fetchCard = async (key: CardKey, url: string) => {
+    (async () => {
+    const ts = await getTurnstileToken();
+    const heavyHeaders: Record<string, string> = {};
+    if (ts.token) {
+      heavyHeaders["x-turnstile-token"] = ts.token;
+    }
+
+    const fetchCard = async (key: CardKey, url: string, headers?: Record<string, string>) => {
       try {
-        const res = await fetch(url);
+        const res = await fetch(url, { headers });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || (res.status === 429 ? "Rate limited — retry shortly" : `HTTP ${res.status}`));
@@ -104,21 +112,24 @@ export default function DomainOverviewClient({ pathDomain }: { pathDomain?: stri
 
     const light: [CardKey, string][] = [
       ["whois", `${API}/whois?domain=${encodeURIComponent(domain)}`],
-      ["email", `${API}/email?domain=${encodeURIComponent(domain)}`],
-      ["dnssec", `${API}/dnssec?domain=${encodeURIComponent(domain)}`],
       ["tls", `${API}/tls?domain=${encodeURIComponent(domain)}`],
       ["headers", `${API}/headers?domain=${encodeURIComponent(domain)}`],
     ];
-    for (const [key, url] of light) fetchCard(key, url);
+    for (const [key, url] of light) fetchCard(key, url, heavyHeaders);
 
-    (async () => {
+    const free: [CardKey, string][] = [
+      ["email", `${API}/email?domain=${encodeURIComponent(domain)}`],
+      ["dnssec", `${API}/dnssec?domain=${encodeURIComponent(domain)}`],
+    ];
+    for (const [key, url] of free) fetchCard(key, url);
+
       const dnsData = await fetchCard("dns", `${API}/lookup?domain=${encodeURIComponent(domain)}&types=A,AAAA,MX,NS`);
       const aRecord = dnsData?.results?.find((r: any) => r.type === "A" && !r.error)?.records?.[0];
       if (!aRecord) {
         setCard("blacklist", { status: "done", data: null });
         return;
       }
-      await fetchCard("blacklist", `${API}/blacklist?ip=${encodeURIComponent(aRecord)}`);
+      await fetchCard("blacklist", `${API}/blacklist?ip=${encodeURIComponent(aRecord)}`, heavyHeaders);
     })();
   }, [domain]);
 
