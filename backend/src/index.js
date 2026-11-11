@@ -51,9 +51,10 @@ app.use(cors({
 }));
 
 // Tiny body limit — none of these endpoints accept request bodies, only
-// query strings. Anything bigger is suspicious. MHA is the exception.
+// query strings. Anything bigger is suspicious. MHA and the Lemon Squeezy
+// webhook are the exceptions.
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/mha')) return next();
+  if (req.path.startsWith('/api/mha') || req.path.startsWith('/api/pro/ls')) return next();
   express.json({ limit: '1kb' })(req, res, next);
 });
 
@@ -146,6 +147,10 @@ app.use('/api/speedtest', speedtestLimiter, require('./routes/speedtest'));
 // own tighter limiter and rides the heavy-endpoint Turnstile gate.
 app.use('/api/batch', requireTurnstile(), require('./routes/batch'));
 app.use('/api/compare', heavyLimiter, requireTurnstile(), require('./routes/compare'));
+// Lemon Squeezy fulfillment — license webhook + buyer self-serve redeem.
+// The webhook route applies its own express.raw; /api/pro/redeem has its
+// own tight limiter inside the module (it triggers LS API calls).
+app.use('/api/pro', require('./routes/pro-fulfil'));
 
 // 404 for anything else
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
