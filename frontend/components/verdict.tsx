@@ -127,7 +127,7 @@ export function RecentsStrip({ exclude }: { exclude?: string }) {
   if (recents.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+    <div className="flex flex-wrap items-center justify-center gap-2 mt-6 mb-2">
       <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50">Recent</span>
       {recents.map(d => (
         <a
