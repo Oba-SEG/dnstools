@@ -191,12 +191,16 @@ router.get('/redeem', redeemLimiter, async (req, res) => {
     }
     if (!order) {
       return res.status(404).json({
-        error: 'Order not found. Open the receipt link in your Lemon Squeezy email — its URL contains the order ID after /orders/.',
+        error: 'Order not found. Open the receipt link in your Lemon Squeezy email — its URL contains the order ID after /my-orders/.',
       });
     }
 
     const a = order.attributes || {};
     const iat = String(a.created_at || '').slice(0, 10);
+    // Mint with the order's own email spelling: combined with the iat above,
+    // this keeps the license byte-identical to the webhook-minted one no
+    // matter how the buyer capitalized their address in the redeem form.
+    const mintEmail = String(a.user_email || email);
     const emailOk = String(a.user_email || '').toLowerCase() === email.toLowerCase();
     const storeOk = !a.store_id || String(a.store_id) === STORE_ID;
     const productId = (a.first_order_item && a.first_order_item.product_id) || null;
@@ -208,8 +212,8 @@ router.get('/redeem', redeemLimiter, async (req, res) => {
     }
     if (!paid) return res.status(402).json({ error: 'Order not marked as paid yet; try again in a minute.' });
 
-    const { license } = mint(order.id, email, iat);
-    minted.set(order.attributes.identifier || orderId, { license, claims: { lic: email, iat }, at: new Date().toISOString() });
+    const { license } = mint(order.id, mintEmail, iat);
+    minted.set(order.attributes.identifier || orderId, { license, claims: { lic: mintEmail, iat }, at: new Date().toISOString() });
     res.setHeader('Content-Disposition', 'attachment; filename="nexus-pro-license.txt"');
     return res.type('text/plain').send(license + '\n');
   } catch (err) {

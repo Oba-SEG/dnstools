@@ -100,7 +100,7 @@ export default function RedeemPage() {
             />
             <p className="text-[10px] text-muted-foreground/60 mt-1.5 leading-relaxed">
               In your Lemon Squeezy receipt email, open the receipt link — the order ID is the long code
-              after <code className="text-orange-300">/orders/</code> in that URL. Pasting the whole URL works too.
+              after <code className="text-orange-300">/my-orders/</code> in that URL. Pasting the whole URL works too.
             </p>
           </div>
           <div>
