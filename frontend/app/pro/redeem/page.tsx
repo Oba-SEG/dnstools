@@ -23,13 +23,14 @@ export default function RedeemPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    // Mount-time query-param initialization (static export, no server params).
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot sync from URL
     const params = new URLSearchParams(window.location.search);
     const oid = extractUuid(params.get("order_id") || "");
     const em = params.get("email") || "";
+    // Mount-time query-param initialization (static export, no server params).
+    /* eslint-disable react-hooks/set-state-in-effect -- one-shot sync from URL */
     setOrderId(oid);
     setEmail(em);
+    /* eslint-enable react-hooks/set-state-in-effect */
     if (UUID_RE.test(oid) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
       fetchLicense(oid, em);
     }
