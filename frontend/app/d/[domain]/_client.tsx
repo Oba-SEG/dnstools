@@ -148,8 +148,10 @@ export default function DomainOverviewClient({ pathDomain }: { pathDomain?: stri
     <main className="min-h-screen bg-[#060810]">
       <header className="border-b border-white/[0.04] bg-[#060810]/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="container mx-auto px-6 py-3.5 flex items-center gap-2.5">
-          <div className="ndns-mark w-8 h-8 text-[12px]">N</div>
-          <h1 className="text-[14px] font-display font-bold tracking-tight text-foreground/90">Nexus Domain Tools</h1>
+          <a href={`${BASE}/`} title="Back to start" className="flex items-center gap-2.5 group">
+            <div className="ndns-mark w-8 h-8 text-[12px] group-hover:opacity-80 transition-opacity">N</div>
+            <h1 className="text-[14px] font-display font-bold tracking-tight text-foreground/90 group-hover:text-orange-300 transition-colors">Nexus Domain Tools</h1>
+          </a>
           <a href={`${BASE}/`} className="ml-auto inline-flex items-center gap-1 text-[11px] text-orange-400 hover:text-orange-300 transition-colors">
             <ArrowLeft className="w-3 h-3" /> All tools
           </a>
