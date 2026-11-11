@@ -2,7 +2,11 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
-import type { Verdict } from "@/lib/verdicts";
+import {
+  blacklistVerdict, dnsVerdict, dnssecVerdict, emailVerdict, headersVerdict,
+  tlsVerdict, whoisVerdict,
+  type Verdict,
+} from "@/lib/verdicts";
 
 const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
 const BASE = STATIC_EXPORT ? "/dnstools" : "";
@@ -136,4 +140,87 @@ export function RecentsStrip({ exclude }: { exclude?: string }) {
       ))}
     </div>
   );
+}
+
+const TAB_VERDICT: Record<string, (d: any) => Verdict> = {
+  lookup: dnsVerdict,
+  email: emailVerdict,
+  tls: tlsVerdict,
+  whois: whoisVerdict,
+  headers: headersVerdict,
+  blacklist: blacklistVerdict,
+  dnssec: dnssecVerdict,
+};
+
+const TAB_NEXT: Record<string, { key: string; label: string }[]> = {
+  lookup: [
+    { key: "propagation", label: "Propagation" },
+    { key: "email", label: "Email audit" },
+    { key: "dnssec", label: "DNSSEC" },
+  ],
+  email: [
+    { key: "blacklist", label: "Blacklists" },
+    { key: "whois", label: "WHOIS" },
+    { key: "lookup", label: "DNS records" },
+  ],
+  tls: [
+    { key: "headers", label: "HTTP headers" },
+    { key: "whois", label: "WHOIS" },
+  ],
+  whois: [
+    { key: "email", label: "Email audit" },
+    { key: "tls", label: "TLS / SSL" },
+  ],
+  headers: [
+    { key: "tls", label: "TLS / SSL" },
+    { key: "whois", label: "WHOIS" },
+  ],
+  blacklist: [
+    { key: "email", label: "Email audit" },
+    { key: "dnssec", label: "DNSSEC" },
+  ],
+  dnssec: [
+    { key: "email", label: "Email audit" },
+    { key: "lookup", label: "DNS records" },
+  ],
+};
+
+export function VerdictBar({ verdict, chips }: { verdict: Verdict; chips?: { label: string; href: string }[] }) {
+  return (
+    <div className="max-w-3xl mx-auto mt-4 premium-surface rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div className="flex items-start gap-2.5 flex-1 min-w-0">
+        <span className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: LEVEL_COLOR[verdict.level] }} />
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold leading-snug" style={{ color: LEVEL_COLOR[verdict.level] }}>
+            {verdict.headline}
+          </p>
+          {verdict.detail && <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{verdict.detail}</p>}
+        </div>
+      </div>
+      {chips && chips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {chips.map(c => (
+            <a
+              key={c.href}
+              href={c.href}
+              className="premium-surface rounded-full px-3 py-1.5 text-[10px] uppercase tracking-widest text-orange-400/90 hover:text-orange-300 border border-white/[0.06] transition-colors"
+            >
+              {c.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ToolVerdict({ tab, domain, data }: { tab: string; domain: string | null; data: any }) {
+  const vfn = TAB_VERDICT[tab];
+  if (!vfn || !domain) return null;
+  const verdict = vfn(data);
+  const chips = (TAB_NEXT[tab] || []).map(({ key, label }) => ({
+    label,
+    href: `${BASE}/?tool=${key}&domain=${encodeURIComponent(domain)}`,
+  }));
+  return <VerdictBar verdict={verdict} chips={chips} />;
 }
