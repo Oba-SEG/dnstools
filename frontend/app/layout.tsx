@@ -5,8 +5,8 @@ import "./globals.css";
 
 // Cloudflare Web Analytics beacon (cookieless, no fingerprinting, no PII we
 // process). The token is a site identifier that ships in page source by
-// design — safe to hardcode. No token set → no script tag.
-const CF_BEACON_TOKEN = process.env.NEXT_PUBLIC_CF_BEACON_TOKEN || "";
+// design — safe to hardcode. Override with NEXT_PUBLIC_CF_BEACON_TOKEN.
+const CF_BEACON_TOKEN = process.env.NEXT_PUBLIC_CF_BEACON_TOKEN || "3a694b494233454fb8ff74d41dfb28c3";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-display", display: "swap", weight: ["500", "600", "700", "800"] });
