@@ -173,6 +173,15 @@ export default function DomainOverviewClient({ pathDomain }: { pathDomain?: stri
               <RecentsStrip exclude={domain ?? undefined} />
             </div>
 
+            <div className="flex justify-center mb-4">
+              <a
+                href={`${BASE}/pro`}
+                className="premium-surface rounded-full px-4 py-1.5 text-[10px] uppercase tracking-widest text-orange-400/90 hover:text-orange-300 border border-orange-500/20 transition-colors"
+              >
+                Turn this dossier into a client-ready report → Pro
+              </a>
+            </div>
+
             <div className="grid sm:grid-cols-2 gap-3">
               {(Object.keys(CARD_META) as CardKey[]).map(key => {
                 const meta = CARD_META[key];
