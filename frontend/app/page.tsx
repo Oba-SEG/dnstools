@@ -7,7 +7,8 @@ import {
   GitCompare, ListChecks,
 } from "lucide-react";
 import { WorldMap } from "@/components/world-map";
-import { RecentsStrip } from "@/components/verdict";
+import { RecentsStrip, ToolVerdict } from "@/components/verdict";
+import { CommandPalette } from "@/components/command-palette";
 import { getTurnstileToken } from "@/lib/turnstile";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
@@ -211,6 +212,13 @@ export default function Home() {
             <h1 className="text-[14px] font-display font-bold tracking-tight text-foreground/90">Nexus Domain Tools</h1>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.dispatchEvent(new Event("ndns-open-palette"))}
+              title="Search (Ctrl/⌘ K)"
+              className="p-2 rounded-lg border border-white/[0.06] text-muted-foreground hover:text-orange-300 hover:border-white/10 transition-colors"
+            >
+              <Search className="w-3.5 h-3.5" />
+            </button>
             <span className="hidden md:inline text-[10px] uppercase tracking-widest text-muted-foreground/60">Free · No login · No data stored</span>
             <a
               href="https://brandprotection.segbytes.co.za"
@@ -399,6 +407,7 @@ export default function Home() {
             {tab === "speedtest" && <SpeedTestView data={data} />}
             {tab === "compare" && <CompareView data={data} />}
             {tab === "batch" && <BatchView data={data} mode={batchMode} />}
+            <ToolVerdict tab={tab} domain={submitted} data={data} />
           </div>
         )}
       </section>
@@ -426,6 +435,8 @@ export default function Home() {
           <span className="sm:hidden">Part of <a href="https://segbytes.co.za" className="text-orange-300/70 hover:text-orange-300">Segbytes</a></span>
         </div>
       </footer>
+
+      <CommandPalette onSwitchTab={(k) => { setTab(k as TabKey); setToolPicked(true); }} />
     </main>
   );
 }
