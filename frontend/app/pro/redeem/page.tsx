@@ -1,10 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Check, Copy, Download, KeyRound } from "lucide-react";
 
 // Production API — override with NEXT_PUBLIC_API_URL for local dev.
 const API = process.env.NEXT_PUBLIC_API_URL || "https://ndns-api.onrender.com/api";
+
+// Buyers often paste the whole receipt URL; pull the order UUID out of it.
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+function extractUuid(raw: string): string {
+  const m = UUID_RE.exec(raw);
+  return m ? m[0] : raw.trim();
+}
 
 export default function RedeemPage() {
   const [orderId, setOrderId] = useState("");
@@ -16,22 +24,26 @@ export default function RedeemPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const oid = params.get("order_id") || "";
+    const oid = extractUuid(params.get("order_id") || "");
     const em = params.get("email") || "";
+    // Mount-time query-param initialization (static export, no server params).
+    /* eslint-disable react-hooks/set-state-in-effect -- one-shot sync from URL */
     setOrderId(oid);
     setEmail(em);
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(oid) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
+    /* eslint-enable react-hooks/set-state-in-effect */
+    if (UUID_RE.test(oid) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
       fetchLicense(oid, em);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function fetchLicense(oid: string, em: string) {
+  async function fetchLicense(oidRaw: string, em: string) {
+    const oid = extractUuid(oidRaw);
     setBusy(true);
     setError("");
     setLicense("");
     try {
-      const r = await fetch(`${API}/api/pro/redeem?order_id=${encodeURIComponent(oid)}&email=${encodeURIComponent(em)}`);
+      const r = await fetch(`${API}/pro/redeem?order_id=${encodeURIComponent(oid)}&email=${encodeURIComponent(em)}`);
       if (r.ok) {
         setLicense((await r.text()).trim());
       } else {
@@ -58,12 +70,12 @@ export default function RedeemPage() {
     <main className="min-h-screen bg-[#060810]">
       <header className="border-b border-white/[0.04]">
         <div className="container mx-auto px-6 py-3.5 flex items-center gap-2.5">
-          <a href="/dnstools/" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2.5">
             <div className="ndns-mark w-8 h-8 text-[12px]">N</div>
             <h1 className="text-[14px] font-display font-bold tracking-tight text-foreground/90">Nexus DNS</h1>
-          </a>
+          </Link>
           <span className="text-[9px] uppercase tracking-widest text-orange-400/80 border border-orange-500/20 rounded-full px-2 py-0.5">Pro</span>
-          <a href="/dnstools/" className="ml-auto text-[11px] text-muted-foreground hover:text-orange-300 transition-colors">← Free tools</a>
+          <Link href="/" className="ml-auto text-[11px] text-muted-foreground hover:text-orange-300 transition-colors">← Free tools</Link>
         </div>
       </header>
 
@@ -86,6 +98,10 @@ export default function RedeemPage() {
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
               className="w-full h-11 px-3.5 rounded-lg bg-white/[0.03] border border-white/[0.06] font-mono text-[12px]"
             />
+            <p className="text-[10px] text-muted-foreground/60 mt-1.5 leading-relaxed">
+              In your Lemon Squeezy receipt email, open the receipt link — the order ID is the long code
+              after <code className="text-orange-300">/my-orders/</code> in that URL. Pasting the whole URL works too.
+            </p>
           </div>
           <div>
             <label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 block mb-1.5">Purchase email</label>
@@ -95,7 +111,7 @@ export default function RedeemPage() {
               placeholder="you@company.com"
               className="w-full h-11 px-3.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-[13px]"
             />
-            <p className="text-[10px] text-muted-foreground/60 mt-1.5">From your Lemon Squeezy receipt if the fields are empty.</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-1.5">The email you paid with, from your Lemon Squeezy receipt.</p>
           </div>
 
           <button

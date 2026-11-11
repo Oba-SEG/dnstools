@@ -22,6 +22,10 @@ const router = express.Router();
 const LS_API = 'https://api.lemonsqueezy.com/v1';
 const STORE_ID = '520835';
 const PRODUCT_ID = '1517438';
+const LS_TIMEOUT_MS = 15000; // hard cap on every Lemon Squeezy API call
+const LS_MAX_PAGES = 10;     // pagination ceiling for the identifier fallback scan
+
+class LsBusy extends Error {} // retryable upstream condition (429 / 5xx)
 
 // --- Minting -------------------------------------------------------------
 
@@ -35,12 +39,14 @@ function b64url(buf) {
   return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function mint(orderRef, email) {
+// iat is the order's creation date (not mint time) so the same order always
+// yields byte-identical licenses, regardless of when it is redeemed.
+function mint(orderRef, email, iat) {
   const claims = {
     lic: email,
     id: 'NP-' + String(orderRef).replace(/[^0-9a-z]/gi, '').slice(0, 10).toUpperCase(),
     plan: 'pro',
-    iat: new Date().toISOString().slice(0, 10),
+    iat: iat || new Date().toISOString().slice(0, 10),
   };
   const payload = b64url(Buffer.from(JSON.stringify(claims)));
   const sig = b64url(crypto.sign(null, Buffer.from(payload), mintKey()));
@@ -94,7 +100,8 @@ router.post('/ls/webhook', express.raw({ type: 'application/json', limit: '256kb
     const productId = (attrs.first_order_item && attrs.first_order_item.product_id) || null;
     if (String(productId) === PRODUCT_ID && email) {
       try {
-        const { license, claims } = mint(data.id, email);
+        const iat = String(attrs.created_at || '').slice(0, 10);
+        const { license, claims } = mint(data.id, email, iat);
         minted.set(identifier, { license, claims, at: new Date().toISOString() });
       } catch (err) {
         console.error('[fulfil] mint failed on webhook:', err.message);
@@ -115,18 +122,32 @@ function lsHeaders() {
   return { Authorization: `Bearer ${key.trim()}`, Accept: 'application/vnd.api+json' };
 }
 
+async function lsFetch(url) {
+  const r = await fetch(url, {
+    headers: lsHeaders(),
+    signal: AbortSignal.timeout(LS_TIMEOUT_MS),
+  });
+  // 429 / 5xx are transient upstream conditions — surface them as retryable
+  // instead of letting redeem report a valid order as "not found".
+  if (r.status === 429 || r.status >= 500) throw new LsBusy(`LS ${r.status}`);
+  return r;
+}
+
 async function lsOrder(orderId) {
-  const r = await fetch(`${LS_API}/orders/${encodeURIComponent(orderId)}`, { headers: lsHeaders() });
+  const r = await lsFetch(`${LS_API}/orders/${encodeURIComponent(orderId)}`);
   if (r.ok) {
     const j = await r.json();
     if (j && j.data) return j.data;
   }
-  // Fallback: scan recent store orders for the UUID identifier.
-  const r2 = await fetch(`${LS_API}/orders?filter%5Bstore_id%5D=${STORE_ID}&page%5Bsize%5D=50`, { headers: lsHeaders() });
-  if (r2.ok) {
+  // Fallback: scan recent store orders for the UUID identifier, walking
+  // pagination until found, the list ends, or the page ceiling is hit.
+  for (let page = 1; page <= LS_MAX_PAGES; page++) {
+    const r2 = await lsFetch(`${LS_API}/orders?filter%5Bstore_id%5D=${STORE_ID}&page%5Bsize%5D=50&page%5Bnumber%5D=${page}`);
+    if (!r2.ok) break;
     const j2 = await r2.json();
-    const hit = (j2.data || []).find(o => o && (o.attributes && o.attributes.identifier) === orderId);
+    const hit = (j2.data || []).find(o => o && o.attributes && o.attributes.identifier === orderId);
     if (hit) return hit;
+    if (!(j2.links && j2.links.next)) break;
   }
   return null;
 }
@@ -168,9 +189,18 @@ router.get('/redeem', redeemLimiter, async (req, res) => {
       console.error('[fulfil] LS API error:', err.message);
       return res.status(503).json({ error: 'License service unavailable; try again shortly.' });
     }
-    if (!order) return res.status(404).json({ error: 'Order not found. Use the details from your Lemon Squeezy receipt email.' });
+    if (!order) {
+      return res.status(404).json({
+        error: 'Order not found. Open the receipt link in your Lemon Squeezy email — its URL contains the order ID after /my-orders/.',
+      });
+    }
 
     const a = order.attributes || {};
+    const iat = String(a.created_at || '').slice(0, 10);
+    // Mint with the order's own email spelling: combined with the iat above,
+    // this keeps the license byte-identical to the webhook-minted one no
+    // matter how the buyer capitalized their address in the redeem form.
+    const mintEmail = String(a.user_email || email);
     const emailOk = String(a.user_email || '').toLowerCase() === email.toLowerCase();
     const storeOk = !a.store_id || String(a.store_id) === STORE_ID;
     const productId = (a.first_order_item && a.first_order_item.product_id) || null;
@@ -182,8 +212,8 @@ router.get('/redeem', redeemLimiter, async (req, res) => {
     }
     if (!paid) return res.status(402).json({ error: 'Order not marked as paid yet; try again in a minute.' });
 
-    const { license } = mint(order.id, email);
-    minted.set(order.attributes.identifier || orderId, { license, claims: { lic: email }, at: new Date().toISOString() });
+    const { license } = mint(order.id, mintEmail, iat);
+    minted.set(order.attributes.identifier || orderId, { license, claims: { lic: mintEmail, iat }, at: new Date().toISOString() });
     res.setHeader('Content-Disposition', 'attachment; filename="nexus-pro-license.txt"');
     return res.type('text/plain').send(license + '\n');
   } catch (err) {
