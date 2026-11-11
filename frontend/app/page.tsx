@@ -7,9 +7,12 @@ import {
   GitCompare, ListChecks,
 } from "lucide-react";
 import { WorldMap } from "@/components/world-map";
+import { RecentsStrip } from "@/components/verdict";
 import { getTurnstileToken } from "@/lib/turnstile";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
+const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
+const BASE = STATIC_EXPORT ? "/dnstools" : "";
 
 function multiTargets(input: string): string[] {
   return input
@@ -48,7 +51,7 @@ const TABS: { key: TabKey; label: string; icon: any; desc: string }[] = [
   { key: "batch",       label: "Batch",           icon: ListChecks, desc: "Auditor mode: WHOIS or DNS over up to 10 domains" },
 ];
 
-function parseDeepLink(): { tool: TabKey; domain: string } | null {
+function parseDeepLink(): { tool: TabKey; domain: string; explicitTool: boolean } | null {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
   const raw = params.get("domain");
@@ -57,8 +60,8 @@ function parseDeepLink(): { tool: TabKey; domain: string } | null {
   const okShape = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(cleaned) || /^(\d{1,3}\.){3}\d{1,3}$/.test(cleaned);
   if (!okShape) return null;
   const tool = params.get("tool");
-  const toolOk = tool && TABS.some((t) => t.key === tool);
-  return { tool: (toolOk ? tool : "lookup") as TabKey, domain: cleaned };
+  const toolOk = !!(tool && TABS.some((t) => t.key === tool));
+  return { tool: (toolOk ? tool : "lookup") as TabKey, domain: cleaned, explicitTool: toolOk };
 }
 
 export default function Home() {
@@ -73,6 +76,7 @@ export default function Home() {
   const [propType, setPropType] = useState<"A" | "AAAA" | "CNAME" | "MX" | "NS" | "TXT">("A");
   const [mhaInput, setMhaInput] = useState("");
   const [batchMode, setBatchMode] = useState<"whois" | "dns">("whois");
+  const [toolPicked, setToolPicked] = useState(false);
 
   const run = async (which: TabKey, target: string) => {
     if (!target && which !== "mha") return;
@@ -174,6 +178,10 @@ export default function Home() {
 
   // Re-run when tab, propType or batch mode changes
   useEffect(() => {
+    if (submitted && deepLink && !deepLink.explicitTool && deepLink.tool === "lookup" && !toolPicked) {
+      window.location.assign(`${BASE}/d/${encodeURIComponent(submitted)}`);
+      return;
+    }
     if (submitted && tab !== "mha") {
       const t = setTimeout(() => run(tab, submitted), 0);
       return () => clearTimeout(t);
@@ -185,6 +193,10 @@ export default function Home() {
     e.preventDefault();
     const cleaned = domain.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
     if (!cleaned) return;
+    if (!toolPicked && tab === "lookup") {
+      window.location.assign(`${BASE}/d/${encodeURIComponent(cleaned)}`);
+      return;
+    }
     setSubmitted(cleaned);
     run(tab, cleaned);
   };
@@ -265,7 +277,10 @@ export default function Home() {
                 return (
                   <button
                     key={t.key}
-                    onClick={() => setTab(t.key)}
+                    onClick={() => {
+                      setTab(t.key);
+                      setToolPicked(true);
+                    }}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap border ${active ? 'bg-orange-500/10 text-orange-300 border-orange-500/20 shadow-[0_0_12px_-3px_rgba(255,122,26,0.2)]' : 'bg-white/[0.02] text-muted-foreground/70 border-white/[0.04] hover:bg-white/[0.04] hover:text-foreground hover:border-white/10'}`}
                   >
                     <Icon className="w-3.5 h-3.5" /> {t.label}
@@ -320,6 +335,11 @@ export default function Home() {
           </div>
         )}
         {!submitted && tab === "lookup" && (
+          <div className="max-w-5xl mx-auto">
+            <RecentsStrip />
+          </div>
+        )}
+        {!submitted && tab === "lookup" && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
             {TABS.map((t) => {
               const Icon = t.icon;
@@ -328,6 +348,7 @@ export default function Home() {
                   key={t.key}
                   onClick={() => {
                     setTab(t.key);
+                    setToolPicked(true);
                     if (t.key === "speedtest") return; // self-contained, no API call needed
                     if (submitted) {
                       run(t.key, submitted);

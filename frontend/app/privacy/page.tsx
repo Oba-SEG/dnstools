@@ -49,6 +49,11 @@ export default function PrivacyPage() {
           traffic (visits, geography, referrers, device types). It sets no
           cookies and collects no personal data we can link back to you.
         </li>
+        <li>
+          <strong>Your recent lookups</strong> are kept in your browser&apos;s
+          local storage (the &quot;Recent&quot; list) so you can reopen them.
+          This never leaves your device and is not sent to us.
+        </li>
       </ul>
 
       <h2>What we never do</h2>
