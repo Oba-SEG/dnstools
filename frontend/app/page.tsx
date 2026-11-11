@@ -343,7 +343,7 @@ export default function Home() {
           </div>
         )}
         {!submitted && tab === "lookup" && (
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-5xl mx-auto mb-8">
             <RecentsStrip />
           </div>
         )}
