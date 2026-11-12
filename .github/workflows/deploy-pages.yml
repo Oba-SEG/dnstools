@@ -36,9 +36,13 @@ jobs:
         working-directory: frontend
         env:
           STATIC_EXPORT: "1"
-          # Empty string: the site is served at the root of the custom domain
-          # (segbytes.xyz, set via frontend/public/CNAME). Legacy fallback for
-          # project pages is baked into next.config.js when unset.
+          # Empty string: the site is served at the root of the custom domain.
+          # The domain itself is configured in the repository's Pages settings
+          # (currently tools.segbytes.xyz); frontend/public/CNAME is kept in
+          # sync with it for consistency. The apex segbytes.xyz hosts the
+          # corporate site (Oba-SEG/segbytes-site).
+          # Legacy fallback for project pages is baked into next.config.js
+          # when unset.
           NEXT_PUBLIC_BASE_PATH: ""
           NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://dns.segbytes.co.za/api' }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '' }}
