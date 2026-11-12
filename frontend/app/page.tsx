@@ -10,6 +10,7 @@ import { WorldMap } from "@/components/world-map";
 import { RecentsStrip, ToolVerdict } from "@/components/verdict";
 import { CommandPalette } from "@/components/command-palette";
 import { getTurnstileToken } from "@/lib/turnstile";
+import { fetchResilient } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
@@ -93,7 +94,7 @@ export default function Home() {
     setData(null);
     try {
       if (which === "mha") {
-        const res = await fetch(`${API}/mha`, {
+        const res = await fetchResilient(`${API}/mha`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ headers: mhaInput }),
@@ -118,7 +119,7 @@ export default function Home() {
           throw new Error("Compare needs exactly two domains, comma-separated: example.com, other.com");
         }
         const headers = await mintHeavyHeader();
-        const res = await fetch(`${API}/compare?${new URLSearchParams({ domain1: list[0], domain2: list[1] })}`, { headers });
+        const res = await fetchResilient(`${API}/compare?${new URLSearchParams({ domain1: list[0], domain2: list[1] })}`, { headers });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || `HTTP ${res.status}`);
@@ -135,7 +136,7 @@ export default function Home() {
           throw new Error(`Batch supports up to 10 domains (got ${list.length}). Split the list and run twice.`);
         }
         const headers = await mintHeavyHeader();
-        const res = await fetch(`${API}/batch?${new URLSearchParams({ domains: list.join(","), mode: batchMode })}`, { headers });
+        const res = await fetchResilient(`${API}/batch?${new URLSearchParams({ domains: list.join(","), mode: batchMode })}`, { headers });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || `HTTP ${res.status}`);
@@ -168,7 +169,11 @@ export default function Home() {
           );
         }
       }
-      const res = await fetch(`${API}/${which}?${params.toString()}`, { headers });
+      const res = await fetchResilient(
+        `${API}/${which}?${params.toString()}`,
+        { headers },
+        (msg) => { if (!stale()) setError(msg); },
+      );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);

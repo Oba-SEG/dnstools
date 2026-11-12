@@ -9,6 +9,7 @@ import {
   VerdictCard, pushRecent, RecentsStrip,
 } from "@/components/verdict";
 import { getTurnstileToken } from "@/lib/turnstile";
+import { fetchResilient } from "@/lib/api";
 import {
   blacklistVerdict, cleanDomain, dnsVerdict, dnssecVerdict, emailVerdict,
   headersVerdict, isDomainish, tlsVerdict, whoisVerdict,
@@ -106,7 +107,9 @@ export default function DomainOverviewClient({ pathDomain }: { pathDomain?: stri
     (async () => {
     const fetchCard = async (key: CardKey, url: string, headers?: Record<string, string>) => {
       try {
-        const res = await fetch(url, { headers });
+        const res = await fetchResilient(url, { headers }, (msg) => {
+          setCard(key, { status: "loading", error: msg });
+        });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || (res.status === 429 ? "Rate limited — retry shortly" : `HTTP ${res.status}`));

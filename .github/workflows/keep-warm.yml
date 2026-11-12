@@ -2,7 +2,11 @@ name: Keep Render API warm
 
 on:
   schedule:
+    # Two offset schedules: GitHub's scheduler throttles busy minutes, so an
+    # off-minute entry doubles the chance of firing on time (Render free tier
+    # spins down after ~15 min idle).
     - cron: "*/12 * * * *"
+    - cron: "6,18,30,42,54 * * * *"
   workflow_dispatch:
 
 concurrency:
