@@ -428,9 +428,9 @@ export default function Home() {
             >
               Suggest an improvement
             </a>
-            <a href="/privacy" className="hover:text-orange-300">Privacy</a>
-            <a href="/terms" className="hover:text-orange-300">Terms</a>
-            <a href="/refund" className="hover:text-orange-300">Refunds</a>
+            <a href={`${BASE}/privacy`} className="hover:text-orange-300">Privacy</a>
+            <a href={`${BASE}/terms`} className="hover:text-orange-300">Terms</a>
+            <a href={`${BASE}/refund`} className="hover:text-orange-300">Refunds</a>
             <span>Part of <a href="https://segbytes.co.za" className="text-orange-300/70 hover:text-orange-300">Segbytes</a></span>
           </div>
           <span className="sm:hidden">Part of <a href="https://segbytes.co.za" className="text-orange-300/70 hover:text-orange-300">Segbytes</a></span>
