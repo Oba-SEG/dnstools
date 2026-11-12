@@ -141,7 +141,9 @@ async function refundPending(txnId) {
       return true;
     }
     // meta.pagination.next is an absolute URL; strip the origin for paddleFetch.
-    const next = j.meta && j.meta.pagination && j.meta.pagination.next;
+    // has_more is Paddle's documented end-of-results signal.
+    const pagination = (j.meta && j.meta.pagination) || {};
+    const next = pagination.has_more ? pagination.next : null;
     url = next ? String(next).replace(PADDLE_API, '') : null;
   }
   return false;
