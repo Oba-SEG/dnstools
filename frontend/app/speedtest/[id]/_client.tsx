@@ -6,7 +6,7 @@ import { Loader2, LinkIcon } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
-const BASE = STATIC_EXPORT ? "/dnstools" : "";
+const BASE = STATIC_EXPORT ? (process.env.NEXT_PUBLIC_BASE_PATH ?? "/dnstools") : "";
 
 const getSpeedColor = (mbps: number) => {
   if (mbps >= 100) return "#10b981";
