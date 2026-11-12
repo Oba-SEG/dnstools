@@ -24,7 +24,11 @@ export default function RedeemPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const oid = extractTxn(params.get("transaction_id") || params.get("order_id") || "");
+    // Paddle redirects here with ?_ptxn=<transaction id> after payment;
+    // transaction_id/order_id cover manual links and the legacy LS flow.
+    const oid = extractTxn(
+      params.get("_ptxn") || params.get("transaction_id") || params.get("order_id") || "",
+    );
     const em = params.get("email") || "";
     // Mount-time query-param initialization (static export, no server params).
     /* eslint-disable react-hooks/set-state-in-effect -- one-shot sync from URL */
@@ -34,7 +38,6 @@ export default function RedeemPage() {
     if (TXN_RE.test(oid) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
       fetchLicense(oid, em);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchLicense(oidRaw: string, em: string) {
@@ -84,8 +87,9 @@ export default function RedeemPage() {
           <KeyRound className="w-6 h-6 text-orange-400 mx-auto mb-3" />
           <h2 className="font-display text-2xl font-bold tracking-tight mb-2">Claim your license</h2>
           <p className="text-[12px] text-muted-foreground leading-relaxed">
-            Your order details were filled in from the checkout redirect. Press the button and
-            your license key appears instantly — nothing is stored, no account needed.
+            Your Transaction ID was filled in from the checkout redirect — just confirm
+            the email you paid with and your license key appears instantly. Nothing is
+            stored, no account needed.
           </p>
         </div>
 

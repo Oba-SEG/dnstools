@@ -2,17 +2,19 @@
 
 // Paddle fulfillment for Nexus DNS Pro.
 //
-//   GET  /api/pro/paddle/checkout            — create a Paddle checkout, return its URL
 //   POST /api/pro/paddle/webhook             — Paddle-Signature verified events
 //   GET  /api/pro/redeem?transaction_id&email — buyer self-serve license download
 //
-// Delivery model (no email provider in the loop): the buyer pays on Paddle's
-// hosted checkout and is redirected to /pro/redeem on the public site, which
-// calls GET /redeem with the Paddle transaction id + buyer email. The order is
+// Checkout is opened client-side by Paddle.js on the sales page (public
+// client-side token) with successUrl = /pro/redeem, where the buyer claims
+// their license. No server-side transaction creation is involved.
+//
+// Delivery model (no email provider in the loop): /pro/redeem calls GET
+// /redeem with the Paddle transaction id + buyer email. The order is
 // validated against the Paddle API (completed status, our price, email match,
-// no approved refund), then a license is minted deterministically — Ed25519
-// signatures are deterministic, so the same transaction always yields the
-// same license string. The webhook pre-caches minted licenses on
+// no pending/approved refund), then a license is minted deterministically —
+// Ed25519 signatures are deterministic, so the same transaction always yields
+// the same license string. The webhook pre-caches minted licenses on
 // transaction.completed and revokes on refund/chargeback adjustments.
 
 const crypto = require('crypto');
@@ -23,7 +25,6 @@ const router = express.Router();
 
 const PADDLE_API = 'https://api.paddle.com';
 const PRICE_ID = process.env.PADDLE_PRICE_ID || 'pri_01m77gfvpjg1c6c1yjcdqs359f';
-const REDEEM_REDIRECT = process.env.PADDLE_REDIRECT_URL || 'https://oba-seg.github.io/dnstools/pro/redeem';
 const PADDLE_TIMEOUT_MS = 15000;
 const SIGNATURE_TTL_S = 300; // reject webhook timestamps older/newer than 5 min
 
@@ -74,12 +75,25 @@ function paddleHeaders() {
   return { Authorization: `Bearer ${key.trim()}`, Accept: 'application/json' };
 }
 
+// For an event payload, the id to log/act on: transactions/customers carry
+// `id`; adjustments carry `transaction_id`.
+function txnRefId(data) {
+  return String(data.transaction_id || data.id || '');
+}
+
 async function paddleFetch(path, opts = {}) {
-  const r = await fetch(`${PADDLE_API}${path}`, {
-    ...opts,
-    headers: { ...paddleHeaders(), ...(opts.headers || {}) },
-    signal: AbortSignal.timeout(PADDLE_TIMEOUT_MS),
-  });
+  let r;
+  try {
+    r = await fetch(`${PADDLE_API}${path}`, {
+      ...opts,
+      headers: { ...paddleHeaders(), ...(opts.headers || {}) },
+      signal: AbortSignal.timeout(PADDLE_TIMEOUT_MS),
+    });
+  } catch (err) {
+    // Network failures and timeouts are transient too — surface them as
+    // retryable instead of reporting a valid transaction as "not found".
+    throw new PaddleBusy(`Paddle unreachable: ${err && err.name === 'TimeoutError' ? 'timeout' : err.message}`);
+  }
   // 429 / 5xx are transient upstream conditions — surface them as retryable
   // instead of letting callers report a valid transaction as "not found".
   if (r.status === 429 || r.status >= 500) throw new PaddleBusy(`Paddle ${r.status}`);
@@ -107,39 +121,6 @@ async function mintAndCache(txnId, customerId, iat) {
     console.error('[fulfil] webhook mint failed:', err.message);
   }
 }
-
-// --- Checkout ------------------------------------------------------------
-
-router.get('/paddle/checkout', async (req, res) => {
-  try {
-    const r = await paddleFetch('/transactions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: [{ price_id: PRICE_ID, quantity: 1 }],
-        checkout_settings: { redirect_url: REDEEM_REDIRECT },
-      }),
-    });
-    if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
-      const code = j.error && j.error.code;
-      console.error('[fulfil] paddle checkout error:', code || r.status);
-      if (code === 'transaction_checkout_not_enabled') {
-        return res.status(503).json({ error: 'Sales activation is still in progress — try again shortly.' });
-      }
-      return res.status(502).json({ error: 'Checkout failed; try again shortly.' });
-    }
-    const t = (await r.json()).data || {};
-    const url = t.checkout && t.checkout.url;
-    if (!url) return res.status(502).json({ error: 'Checkout unavailable; try again shortly.' });
-    noteAudit({ at: new Date().toISOString(), event: 'checkout_created', identifier: t.id });
-    return res.status(200).json({ url, transaction_id: t.id });
-  } catch (err) {
-    if (err instanceof PaddleBusy) return res.status(503).json({ error: 'Checkout service busy; try again shortly.' });
-    console.error('[fulfil] checkout error:', err.message);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
 
 // --- Webhook ---------------------------------------------------------------
 
@@ -173,30 +154,25 @@ router.post('/paddle/webhook', express.raw({ type: '*/*', limit: '256kb' }), (re
     return res.status(400).json({ error: 'bad json' });
   }
 
-  const event = body.event || 'unknown';
+  // Paddle Billing events carry the name in `event_type`.
+  const event = body.event_type || 'unknown';
   const data = body.data || {};
-  const txnId = String(data.id || data.transaction_id || '');
 
-  noteAudit({ at: new Date().toISOString(), event, identifier: txnId });
+  noteAudit({ at: new Date().toISOString(), event, identifier: txnRefId(data) });
 
   if (event === 'transaction.completed') {
+    const txnId = String(data.id || '');
     const iat = String(data.created_at || '').slice(0, 10);
-    const customer = data.customer;
-    // Embedded customer (sensitive fields enabled) mints inline; a bare id
-    // triggers an async API lookup. Either way redeem remains authoritative.
-    if (customer && typeof customer === 'object' && customer.email) {
-      try {
-        const { license, claims } = mint(txnId, customer.email, iat);
-        minted.set(txnId, { license, claims, at: new Date().toISOString() });
-      } catch (err) {
-        console.error('[fulfil] mint failed on webhook:', err.message);
-      }
-    } else {
-      mintAndCache(txnId, customer || null, iat);
-    }
+    // Webhooks carry the customer as a bare id (ctm_…); mint from the API
+    // record so the buyer email is the authoritative spelling. Fire-and-forget
+    // — redeem mints on demand anyway.
+    mintAndCache(txnId, data.customer_id || null, iat);
   } else if (event === 'adjustment.created') {
+    // For adjustment events `data.id` is the adjustment (adj_…); the affected
+    // sale is `data.transaction_id`.
+    const txnId = String(data.transaction_id || '');
     const action = data.action;
-    if (action === 'refund' || action === 'chargeback') {
+    if (txnId && (action === 'refund' || action === 'chargeback')) {
       refunded.add(txnId);
       minted.delete(txnId);
     }
@@ -249,7 +225,7 @@ router.get('/redeem', redeemLimiter, async (req, res) => {
       return res.status(402).json({ error: 'Payment not completed yet; try again in a minute.' });
     }
     const lineItems = (t.details && t.details.line_items) || [];
-    if (!lineItems.some(li => li.price && li.price.id === PRICE_ID)) {
+    if (!lineItems.some(li => li.price_id === PRICE_ID)) {
       return res.status(403).json({ error: 'This transaction is not for this product.' });
     }
 
@@ -259,14 +235,20 @@ router.get('/redeem', redeemLimiter, async (req, res) => {
       return res.status(403).json({ error: 'Email does not match this transaction.' });
     }
 
-    // 4) Refunds/chargebacks revoke the license.
-    const ar = await paddleFetch(`/adjustments?filter%5Btransaction_id%5D=${encodeURIComponent(txnId)}`);
-    if (ar.ok) {
-      const list = (await ar.json()).data || [];
-      if (list.some(x => (x.action === 'refund' || x.action === 'chargeback') && (x.status === 'approved' || x.status === 'pending'))) {
-        refunded.add(txnId);
-        return res.status(403).json({ error: 'This transaction was refunded — no license can be issued.' });
-      }
+    // 4) Refunds/chargebacks revoke the license. `transaction_id` is a plain
+    // query parameter on GET /adjustments (not filter[transaction_id]); any
+    // API failure here fails closed — no refund check, no license.
+    const ar = await paddleFetch(`/adjustments?transaction_id=${encodeURIComponent(txnId)}&per_page=200`);
+    if (!ar.ok) throw new PaddleBusy(`Paddle adjustments ${ar.status}`);
+    const adjList = (await ar.json()).data || [];
+    const refundPending = adjList.some(
+      x =>
+        (x.action === 'refund' || x.action === 'chargeback') &&
+        (x.status === 'pending_approval' || x.status === 'approved'),
+    );
+    if (refundPending) {
+      refunded.add(txnId);
+      return res.status(403).json({ error: 'This transaction was refunded — no license can be issued.' });
     }
 
     const iat = String(t.created_at || '').slice(0, 10);

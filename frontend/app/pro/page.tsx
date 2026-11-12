@@ -1,14 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { initializePaddle } from "@paddle/paddle-js";
 import { Check, Download, FileText, GitBranch, ListChecks, Lock, Minus, Monitor, X } from "lucide-react";
 
-// Checkout: the backend creates a Paddle transaction per click and returns
-// the hosted-checkout URL; Paddle redirects the buyer to /pro/redeem after
-// payment to claim their license instantly.
-const API = process.env.NEXT_PUBLIC_API_URL || "https://ndns-api.onrender.com/api";
+// Checkout: Paddle.js overlay (public client-side token — no secrets here).
+// After payment, Paddle redirects to /pro/redeem (successUrl, resolved
+// relative to this page so it works under any host/base path) and appends
+// ?_ptxn=<transaction id> for the redemption page to pick up.
+const PADDLE_TOKEN = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || "";
+const PRICE_ID = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID || "pri_01m77gfvpjg1c6c1yjcdqs359f";
 const PRICE = "$79";
+
+let paddleInit: ReturnType<typeof initializePaddle> | null = null;
+function openCheckout(): Promise<void> {
+  if (!paddleInit) paddleInit = initializePaddle({ token: PADDLE_TOKEN });
+  return paddleInit.then(paddle => {
+    if (!paddle) throw new Error("checkout init failed");
+    paddle.Checkout.open({
+      items: [{ priceId: PRICE_ID, quantity: 1 }],
+      settings: {
+        displayMode: "overlay",
+        theme: "dark",
+        successUrl: new URL("pro/redeem", window.location.href).href,
+      },
+    });
+  });
+}
 
 const FEATURES = [
   { icon: ListChecks, title: "Batch audits", desc: "Fan out up to 100 domains per run — WHOIS facts or full DNS records — with a live results table." },
@@ -32,21 +51,20 @@ const COMPARE: { label: string; free: string | boolean; pro: string | boolean }[
 ];
 
 export default function ProSalesPage() {
-  const [mounted, setMounted] = useState(false);
   const [buyBusy, setBuyBusy] = useState(false);
   const [buyErr, setBuyErr] = useState("");
-  useEffect(() => { const id = setTimeout(() => setMounted(true), 0); return () => clearTimeout(id); }, []);
 
   async function buy() {
     setBuyBusy(true);
     setBuyErr("");
     try {
-      const r = await fetch(`${API}/pro/paddle/checkout`);
-      const j = await r.json().catch(() => ({}));
-      if (r.ok && j.url) { window.location.assign(j.url); return; }
-      setBuyErr(j.error || "Checkout is unavailable right now — try again shortly.");
+      if (!PADDLE_TOKEN) {
+        setBuyErr("Checkout is being set up — try again shortly.");
+        return;
+      }
+      await openCheckout();
     } catch {
-      setBuyErr("Network error — check your connection and try again.");
+      setBuyErr("Checkout failed to open — check your connection and try again.");
     } finally {
       setBuyBusy(false);
     }
