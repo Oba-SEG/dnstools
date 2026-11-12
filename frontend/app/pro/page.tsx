@@ -196,6 +196,7 @@ export default function ProSalesPage() {
           <div className="flex items-center gap-4 text-[10px] uppercase tracking-widest text-muted-foreground/60">
             <Link href="/privacy" className="hover:text-orange-300 transition-colors">Privacy</Link>
             <Link href="/terms" className="hover:text-orange-300 transition-colors">Terms</Link>
+            <Link href="/refund" className="hover:text-orange-300 transition-colors">Refunds</Link>
           </div>
         </div>
       </footer>

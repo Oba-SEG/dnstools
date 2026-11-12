@@ -29,6 +29,7 @@ export function LegalShell({ title, updated, children, styles }: {
           <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
             <Link href="/privacy" className="hover:text-orange-300">Privacy</Link>
             <Link href="/terms" className="hover:text-orange-300">Terms</Link>
+            <Link href="/refund" className="hover:text-orange-300">Refunds</Link>
           </div>
         </div>
       </header>
@@ -44,6 +45,8 @@ export function LegalShell({ title, updated, children, styles }: {
             <Link href="/privacy" className="hover:text-orange-300">Privacy</Link>
             {" · "}
             <Link href="/terms" className="hover:text-orange-300">Terms</Link>
+            {" · "}
+            <Link href="/refund" className="hover:text-orange-300">Refunds</Link>
             {" · "}
             <span>Part of <a href="https://segbytes.co.za" className="text-orange-300/70 hover:text-orange-300">Segbytes</a></span>
           </span>
