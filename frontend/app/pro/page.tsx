@@ -1,15 +1,60 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { CheckoutEventNames, initializePaddle, type Paddle } from "@paddle/paddle-js";
 import { Check, Download, FileText, GitBranch, ListChecks, Lock, Minus, Monitor, X } from "lucide-react";
 
-// Swap these when the LemonSqueezy product goes live; leave BUY_URL empty
-// to show the "sales open soon" state.
-// Custom checkout (API-created): same product/price, but the success redirect
-// lands the buyer on /pro/redeem to claim their license instantly.
-const BUY_URL = "https://segbytes.lemonsqueezy.com/checkout/custom/c77c6cb9-823c-46ef-86d1-6399178168d4?signature=bb5059a9464a4eaf175aeae2e1bfe4e541076c2891df2dd628ee7f384a1f01f1";
+// Checkout: Paddle.js overlay (public client-side token — no secrets here).
+// When payment completes, Paddle shows its own success screen and we hand the
+// buyer off to /pro/redeem with the transaction id embedded in the URL —
+// deterministic, no reliance on Paddle's redirect-parameter behavior.
+const PADDLE_TOKEN = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || "";
+const PRICE_ID = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID || "pri_01m77gfvpjg1c6c1yjcdqs359f";
 const PRICE = "$79";
+
+// Sales page lives at <base>/pro/ in the static export; resolve the redeem
+// page against the normalized current directory so "pro" never doubles up.
+function redeemHandoffUrl(transactionId: string): string {
+  const dir = window.location.href.split(/[?#]/)[0].replace(/\/?$/, "/");
+  const url = new URL("redeem", dir);
+  if (transactionId) url.searchParams.set("transaction_id", transactionId);
+  return url.href;
+}
+
+let paddleInit: Promise<Paddle | undefined> | null = null;
+function getPaddle(): Promise<Paddle | undefined> {
+  if (!paddleInit) {
+    paddleInit = initializePaddle({
+      token: PADDLE_TOKEN,
+      eventCallback: ev => {
+        if (ev.name !== CheckoutEventNames.CHECKOUT_COMPLETED) return;
+        const d = ev.data as { transaction_id?: string; id?: string } | undefined;
+        setTimeout(() => { window.location.assign(redeemHandoffUrl(String((d && (d.transaction_id || d.id)) || ""))); }, 2500);
+      },
+    })
+      .then(paddle => {
+        // Failed/empty init: drop the cache so the next click can retry.
+        if (!paddle) paddleInit = null;
+        return paddle;
+      })
+      .catch(err => {
+        paddleInit = null;
+        throw err;
+      });
+  }
+  return paddleInit;
+}
+
+function openCheckout(): Promise<void> {
+  return getPaddle().then(paddle => {
+    if (!paddle) throw new Error("checkout init failed");
+    paddle.Checkout.open({
+      items: [{ priceId: PRICE_ID, quantity: 1 }],
+      settings: { displayMode: "overlay", theme: "dark" },
+    });
+  });
+}
 
 const FEATURES = [
   { icon: ListChecks, title: "Batch audits", desc: "Fan out up to 100 domains per run — WHOIS facts or full DNS records — with a live results table." },
@@ -33,8 +78,24 @@ const COMPARE: { label: string; free: string | boolean; pro: string | boolean }[
 ];
 
 export default function ProSalesPage() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { const id = setTimeout(() => setMounted(true), 0); return () => clearTimeout(id); }, []);
+  const [buyBusy, setBuyBusy] = useState(false);
+  const [buyErr, setBuyErr] = useState("");
+
+  async function buy() {
+    setBuyBusy(true);
+    setBuyErr("");
+    try {
+      if (!PADDLE_TOKEN) {
+        setBuyErr("Checkout is being set up — try again shortly.");
+        return;
+      }
+      await openCheckout();
+    } catch {
+      setBuyErr("Checkout failed to open — check your connection and try again.");
+    } finally {
+      setBuyBusy(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#060810]">
@@ -59,22 +120,20 @@ export default function ProSalesPage() {
           domains never touch a third-party SaaS.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-          {BUY_URL ? (
-            <a
-              href={BUY_URL}
-              className="btn-primary px-8 py-3 rounded-xl text-sm font-bold inline-flex items-center gap-2"
-            >
-              Buy Nexus Pro — {PRICE} one-time
-            </a>
-          ) : (
-            <span className="px-8 py-3 rounded-xl text-sm font-bold inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] text-muted-foreground cursor-not-allowed">
-              Sales open soon — {PRICE} one-time
-            </span>
-          )}
+          <button
+            onClick={buy}
+            disabled={buyBusy}
+            className="btn-primary px-8 py-3 rounded-xl text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-wait"
+          >
+            {buyBusy ? "Opening checkout…" : `Buy Nexus Pro — ${PRICE} one-time`}
+          </button>
           <a href="mailto:obakengsegoatlhe@gmail.com?subject=Nexus%20Pro%20enquiry" className="text-xs text-muted-foreground hover:text-orange-300 transition-colors underline">
             Questions? Email us
           </a>
         </div>
+        {buyErr && (
+          <p className="mt-4 text-[12px] text-red-300 bg-red-500/[0.06] border border-red-500/20 rounded-lg p-3 max-w-md mx-auto leading-relaxed">{buyErr}</p>
+        )}
       </section>
 
       <section className="container mx-auto px-6 pb-16 max-w-4xl mx-auto">
@@ -124,8 +183,8 @@ export default function ProSalesPage() {
         </div>
         <p className="text-[11px] text-muted-foreground mt-4 text-center leading-relaxed">
           {PRICE} one-time · perpetual license · one deployment per license · the free public tools
-          stay free and anonymous, always. Sales handled by our merchant of record (Lemon Squeezy);
-          taxes included at checkout. Right after payment, Lemon Squeezy hands you off to the
+          stay free and anonymous, always. Sales handled by our merchant of record (Paddle);
+          taxes included at checkout. Right after payment, Paddle hands you off to the
           {" "}<Link href="/pro/redeem" className="text-orange-300 underline hover:text-orange-200">redemption page</Link>,
           where your license key appears instantly — no waiting on email.
         </p>

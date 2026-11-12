@@ -7,10 +7,10 @@ import { Check, Copy, Download, KeyRound } from "lucide-react";
 // Production API — override with NEXT_PUBLIC_API_URL for local dev.
 const API = process.env.NEXT_PUBLIC_API_URL || "https://ndns-api.onrender.com/api";
 
-// Buyers often paste the whole receipt URL; pull the order UUID out of it.
-const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-function extractUuid(raw: string): string {
-  const m = UUID_RE.exec(raw);
+// Buyers often paste extra text around the id; pull the txn token out of it.
+const TXN_RE = /txn_[a-z0-9]{8,}/i;
+function extractTxn(raw: string): string {
+  const m = TXN_RE.exec(raw);
   return m ? m[0] : raw.trim();
 }
 
@@ -24,26 +24,29 @@ export default function RedeemPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const oid = extractUuid(params.get("order_id") || "");
+    // Paddle redirects here with ?_ptxn=<transaction id> after payment;
+    // transaction_id/order_id cover manual links and the legacy LS flow.
+    const oid = extractTxn(
+      params.get("_ptxn") || params.get("transaction_id") || params.get("order_id") || "",
+    );
     const em = params.get("email") || "";
     // Mount-time query-param initialization (static export, no server params).
     /* eslint-disable react-hooks/set-state-in-effect -- one-shot sync from URL */
     setOrderId(oid);
     setEmail(em);
     /* eslint-enable react-hooks/set-state-in-effect */
-    if (UUID_RE.test(oid) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
+    if (TXN_RE.test(oid) && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) {
       fetchLicense(oid, em);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchLicense(oidRaw: string, em: string) {
-    const oid = extractUuid(oidRaw);
+    const oid = extractTxn(oidRaw);
     setBusy(true);
     setError("");
     setLicense("");
     try {
-      const r = await fetch(`${API}/pro/redeem?order_id=${encodeURIComponent(oid)}&email=${encodeURIComponent(em)}`);
+      const r = await fetch(`${API}/pro/redeem?transaction_id=${encodeURIComponent(oid)}&email=${encodeURIComponent(em)}`);
       if (r.ok) {
         setLicense((await r.text()).trim());
       } else {
@@ -84,23 +87,25 @@ export default function RedeemPage() {
           <KeyRound className="w-6 h-6 text-orange-400 mx-auto mb-3" />
           <h2 className="font-display text-2xl font-bold tracking-tight mb-2">Claim your license</h2>
           <p className="text-[12px] text-muted-foreground leading-relaxed">
-            Your order details were filled in from the checkout redirect. Press the button and
-            your license key appears instantly — nothing is stored, no account needed.
+            Your Transaction ID was filled in from the checkout redirect — just confirm
+            the email you paid with and your license key appears instantly. No account
+            needed; the license API holds your email and issued license only in a
+            short-lived in-memory cache (cleared on each deploy).
           </p>
         </div>
 
         <div className="premium-surface rounded-2xl p-5 space-y-4">
           <div>
-            <label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 block mb-1.5">Order ID</label>
+            <label className="text-[10px] uppercase tracking-widest text-muted-foreground/60 block mb-1.5">Transaction ID</label>
             <input
               value={orderId}
               onChange={e => setOrderId(e.target.value)}
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              placeholder="txn_01h…"
               className="w-full h-11 px-3.5 rounded-lg bg-white/[0.03] border border-white/[0.06] font-mono text-[12px]"
             />
             <p className="text-[10px] text-muted-foreground/60 mt-1.5 leading-relaxed">
-              In your Lemon Squeezy receipt email, open the receipt link — the order ID is the long code
-              after <code className="text-orange-300">/my-orders/</code> in that URL. Pasting the whole URL works too.
+              From your Paddle receipt — the Transaction ID starts with{' '}
+              <code className="text-orange-300">txn_</code>. Pasting the whole receipt line works too.
             </p>
           </div>
           <div>
@@ -111,7 +116,7 @@ export default function RedeemPage() {
               placeholder="you@company.com"
               className="w-full h-11 px-3.5 rounded-lg bg-white/[0.03] border border-white/[0.06] text-[13px]"
             />
-            <p className="text-[10px] text-muted-foreground/60 mt-1.5">The email you paid with, from your Lemon Squeezy receipt.</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-1.5">The email you paid with, from your Paddle receipt.</p>
           </div>
 
           <button
