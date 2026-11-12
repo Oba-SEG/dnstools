@@ -179,7 +179,8 @@ export default function Home() {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       const body = await res.json();
-      if (!stale()) setData(body);
+      // Clear any transient retry note ("Waking the API…") left by onNote.
+      if (!stale()) { setData(body); setError(null); }
     } catch (e: any) {
       if (!stale()) setError(e?.message || "Request failed");
     } finally {
