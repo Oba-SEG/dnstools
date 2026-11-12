@@ -32,7 +32,16 @@ function getPaddle(): Promise<Paddle | undefined> {
         const d = ev.data as { transaction_id?: string; id?: string } | undefined;
         setTimeout(() => { window.location.assign(redeemHandoffUrl(String((d && (d.transaction_id || d.id)) || ""))); }, 2500);
       },
-    });
+    })
+      .then(paddle => {
+        // Failed/empty init: drop the cache so the next click can retry.
+        if (!paddle) paddleInit = null;
+        return paddle;
+      })
+      .catch(err => {
+        paddleInit = null;
+        throw err;
+      });
   }
   return paddleInit;
 }

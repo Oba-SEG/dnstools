@@ -126,18 +126,25 @@ async function mintAndCache(txnId, customerId, iat) {
 // approval — revokes the license. Checked live on every serve (cache hits
 // included) so the in-memory `refunded` set is only an optimization, never
 // the authority: webhook timing and multi-instance deployments can't leave a
-// refunded license redeemable. Fails closed on Paddle errors.
+// refunded license redeemable. Walks every adjustments page before concluding
+// "no refund", and fails closed on any Paddle error.
 async function refundPending(txnId) {
-  const ar = await paddleFetch(`/adjustments?transaction_id=${encodeURIComponent(txnId)}&per_page=200`);
-  if (!ar.ok) throw new PaddleBusy(`Paddle adjustments ${ar.status}`);
-  const adjList = (await ar.json()).data || [];
-  const pending = adjList.some(
-    x =>
-      (x.action === 'refund' || x.action === 'chargeback') &&
-      (x.status === 'pending_approval' || x.status === 'approved'),
-  );
-  if (pending) refunded.add(txnId);
-  return pending;
+  const BLOCK = new Set(['pending_approval', 'approved']);
+  let url = `/adjustments?transaction_id=${encodeURIComponent(txnId)}&per_page=200`;
+  while (url) {
+    const r = await paddleFetch(url);
+    if (!r.ok) throw new PaddleBusy(`Paddle adjustments ${r.status}`);
+    const j = await r.json();
+    const adjList = j.data || [];
+    if (adjList.some(x => (x.action === 'refund' || x.action === 'chargeback') && BLOCK.has(x.status))) {
+      refunded.add(txnId);
+      return true;
+    }
+    // meta.pagination.next is an absolute URL; strip the origin for paddleFetch.
+    const next = j.meta && j.meta.pagination && j.meta.pagination.next;
+    url = next ? String(next).replace(PADDLE_API, '') : null;
+  }
+  return false;
 }
 
 // --- Webhook ---------------------------------------------------------------
@@ -181,10 +188,14 @@ router.post('/paddle/webhook', express.raw({ type: '*/*', limit: '256kb' }), (re
   if (event === 'transaction.completed') {
     const txnId = String(data.id || '');
     const iat = String(data.created_at || '').slice(0, 10);
-    // Webhooks carry the customer as a bare id (ctm_…); mint from the API
-    // record so the buyer email is the authoritative spelling. Fire-and-forget
-    // — redeem mints on demand anyway.
-    mintAndCache(txnId, data.customer_id || null, iat);
+    // Only pre-mint transactions for our price — webhook payloads carry the
+    // line items; without details we skip the cache entirely (redeem remains
+    // authoritative). Webhooks carry the customer as a bare id (ctm_…); the
+    // email comes from the API record for the authoritative spelling.
+    const lineItems = (data.details && data.details.line_items) || [];
+    if (lineItems.some(li => li.price_id === PRICE_ID)) {
+      mintAndCache(txnId, data.customer_id || null, iat);
+    }
   } else if (event === 'adjustment.created') {
     // For adjustment events `data.id` is the adjustment (adj_…); the affected
     // sale is `data.transaction_id`.
