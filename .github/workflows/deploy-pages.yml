@@ -38,6 +38,7 @@ jobs:
           STATIC_EXPORT: "1"
           NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://dns.segbytes.co.za/api' }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '' }}
+          NEXT_PUBLIC_PADDLE_CLIENT_TOKEN: ${{ vars.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '' }}
       - name: Configure pages
         id: pages
         uses: actions/configure-pages@v5
