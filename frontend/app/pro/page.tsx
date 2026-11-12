@@ -4,11 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Download, FileText, GitBranch, ListChecks, Lock, Minus, Monitor, X } from "lucide-react";
 
-// Swap these when the LemonSqueezy product goes live; leave BUY_URL empty
-// to show the "sales open soon" state.
-// Custom checkout (API-created): same product/price, but the success redirect
-// lands the buyer on /pro/redeem to claim their license instantly.
-const BUY_URL = "https://segbytes.lemonsqueezy.com/checkout/custom/c77c6cb9-823c-46ef-86d1-6399178168d4?signature=bb5059a9464a4eaf175aeae2e1bfe4e541076c2891df2dd628ee7f384a1f01f1";
+// Checkout: the backend creates a Paddle transaction per click and returns
+// the hosted-checkout URL; Paddle redirects the buyer to /pro/redeem after
+// payment to claim their license instantly.
+const API = process.env.NEXT_PUBLIC_API_URL || "https://ndns-api.onrender.com/api";
 const PRICE = "$79";
 
 const FEATURES = [
@@ -34,7 +33,24 @@ const COMPARE: { label: string; free: string | boolean; pro: string | boolean }[
 
 export default function ProSalesPage() {
   const [mounted, setMounted] = useState(false);
+  const [buyBusy, setBuyBusy] = useState(false);
+  const [buyErr, setBuyErr] = useState("");
   useEffect(() => { const id = setTimeout(() => setMounted(true), 0); return () => clearTimeout(id); }, []);
+
+  async function buy() {
+    setBuyBusy(true);
+    setBuyErr("");
+    try {
+      const r = await fetch(`${API}/pro/paddle/checkout`);
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.url) { window.location.assign(j.url); return; }
+      setBuyErr(j.error || "Checkout is unavailable right now — try again shortly.");
+    } catch {
+      setBuyErr("Network error — check your connection and try again.");
+    } finally {
+      setBuyBusy(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#060810]">
@@ -59,22 +75,20 @@ export default function ProSalesPage() {
           domains never touch a third-party SaaS.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-          {BUY_URL ? (
-            <a
-              href={BUY_URL}
-              className="btn-primary px-8 py-3 rounded-xl text-sm font-bold inline-flex items-center gap-2"
-            >
-              Buy Nexus Pro — {PRICE} one-time
-            </a>
-          ) : (
-            <span className="px-8 py-3 rounded-xl text-sm font-bold inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] text-muted-foreground cursor-not-allowed">
-              Sales open soon — {PRICE} one-time
-            </span>
-          )}
+          <button
+            onClick={buy}
+            disabled={buyBusy}
+            className="btn-primary px-8 py-3 rounded-xl text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60 disabled:cursor-wait"
+          >
+            {buyBusy ? "Opening checkout…" : `Buy Nexus Pro — ${PRICE} one-time`}
+          </button>
           <a href="mailto:obakengsegoatlhe@gmail.com?subject=Nexus%20Pro%20enquiry" className="text-xs text-muted-foreground hover:text-orange-300 transition-colors underline">
             Questions? Email us
           </a>
         </div>
+        {buyErr && (
+          <p className="mt-4 text-[12px] text-red-300 bg-red-500/[0.06] border border-red-500/20 rounded-lg p-3 max-w-md mx-auto leading-relaxed">{buyErr}</p>
+        )}
       </section>
 
       <section className="container mx-auto px-6 pb-16 max-w-4xl mx-auto">
@@ -124,8 +138,8 @@ export default function ProSalesPage() {
         </div>
         <p className="text-[11px] text-muted-foreground mt-4 text-center leading-relaxed">
           {PRICE} one-time · perpetual license · one deployment per license · the free public tools
-          stay free and anonymous, always. Sales handled by our merchant of record (Lemon Squeezy);
-          taxes included at checkout. Right after payment, Lemon Squeezy hands you off to the
+          stay free and anonymous, always. Sales handled by our merchant of record (Paddle);
+          taxes included at checkout. Right after payment, Paddle hands you off to the
           {" "}<Link href="/pro/redeem" className="text-orange-300 underline hover:text-orange-200">redemption page</Link>,
           where your license key appears instantly — no waiting on email.
         </p>
