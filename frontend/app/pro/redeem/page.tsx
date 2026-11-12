@@ -88,8 +88,9 @@ export default function RedeemPage() {
           <h2 className="font-display text-2xl font-bold tracking-tight mb-2">Claim your license</h2>
           <p className="text-[12px] text-muted-foreground leading-relaxed">
             Your Transaction ID was filled in from the checkout redirect — just confirm
-            the email you paid with and your license key appears instantly. Nothing is
-            stored, no account needed.
+            the email you paid with and your license key appears instantly. No account
+            needed; the license API holds your email and issued license only in a
+            short-lived in-memory cache (cleared on each deploy).
           </p>
         </div>
 

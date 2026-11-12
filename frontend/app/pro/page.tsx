@@ -2,29 +2,47 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { initializePaddle } from "@paddle/paddle-js";
+import { CheckoutEventNames, initializePaddle, type Paddle } from "@paddle/paddle-js";
 import { Check, Download, FileText, GitBranch, ListChecks, Lock, Minus, Monitor, X } from "lucide-react";
 
 // Checkout: Paddle.js overlay (public client-side token — no secrets here).
-// After payment, Paddle redirects to /pro/redeem (successUrl, resolved
-// relative to this page so it works under any host/base path) and appends
-// ?_ptxn=<transaction id> for the redemption page to pick up.
+// When payment completes, Paddle shows its own success screen and we hand the
+// buyer off to /pro/redeem with the transaction id embedded in the URL —
+// deterministic, no reliance on Paddle's redirect-parameter behavior.
 const PADDLE_TOKEN = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || "";
 const PRICE_ID = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID || "pri_01m77gfvpjg1c6c1yjcdqs359f";
 const PRICE = "$79";
 
-let paddleInit: ReturnType<typeof initializePaddle> | null = null;
+// Sales page lives at <base>/pro/ in the static export; resolve the redeem
+// page against the normalized current directory so "pro" never doubles up.
+function redeemHandoffUrl(transactionId: string): string {
+  const dir = window.location.href.split(/[?#]/)[0].replace(/\/?$/, "/");
+  const url = new URL("redeem", dir);
+  if (transactionId) url.searchParams.set("transaction_id", transactionId);
+  return url.href;
+}
+
+let paddleInit: Promise<Paddle | undefined> | null = null;
+function getPaddle(): Promise<Paddle | undefined> {
+  if (!paddleInit) {
+    paddleInit = initializePaddle({
+      token: PADDLE_TOKEN,
+      eventCallback: ev => {
+        if (ev.name !== CheckoutEventNames.CHECKOUT_COMPLETED) return;
+        const d = ev.data as { transaction_id?: string; id?: string } | undefined;
+        setTimeout(() => { window.location.assign(redeemHandoffUrl(String((d && (d.transaction_id || d.id)) || ""))); }, 2500);
+      },
+    });
+  }
+  return paddleInit;
+}
+
 function openCheckout(): Promise<void> {
-  if (!paddleInit) paddleInit = initializePaddle({ token: PADDLE_TOKEN });
-  return paddleInit.then(paddle => {
+  return getPaddle().then(paddle => {
     if (!paddle) throw new Error("checkout init failed");
     paddle.Checkout.open({
       items: [{ priceId: PRICE_ID, quantity: 1 }],
-      settings: {
-        displayMode: "overlay",
-        theme: "dark",
-        successUrl: new URL("pro/redeem", window.location.href).href,
-      },
+      settings: { displayMode: "overlay", theme: "dark" },
     });
   });
 }

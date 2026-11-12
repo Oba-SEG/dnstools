@@ -122,6 +122,24 @@ async function mintAndCache(txnId, customerId, iat) {
   }
 }
 
+// A refund or chargeback Paddle has recorded — even one still awaiting
+// approval — revokes the license. Checked live on every serve (cache hits
+// included) so the in-memory `refunded` set is only an optimization, never
+// the authority: webhook timing and multi-instance deployments can't leave a
+// refunded license redeemable. Fails closed on Paddle errors.
+async function refundPending(txnId) {
+  const ar = await paddleFetch(`/adjustments?transaction_id=${encodeURIComponent(txnId)}&per_page=200`);
+  if (!ar.ok) throw new PaddleBusy(`Paddle adjustments ${ar.status}`);
+  const adjList = (await ar.json()).data || [];
+  const pending = adjList.some(
+    x =>
+      (x.action === 'refund' || x.action === 'chargeback') &&
+      (x.status === 'pending_approval' || x.status === 'approved'),
+  );
+  if (pending) refunded.add(txnId);
+  return pending;
+}
+
 // --- Webhook ---------------------------------------------------------------
 
 router.post('/paddle/webhook', express.raw({ type: '*/*', limit: '256kb' }), (req, res) => {
@@ -204,9 +222,13 @@ router.get('/redeem', redeemLimiter, async (req, res) => {
   }
 
   try {
-    // 1) Fast path: pre-minted by the webhook.
+    // 1) Fast path: pre-minted by the webhook. The live refund check still
+    // runs — the cache only skips the transaction/customer fetch.
     const hit = minted.get(txnId);
     if (hit && !refunded.has(txnId) && hit.claims.lic.toLowerCase() === email.toLowerCase()) {
+      if (await refundPending(txnId)) {
+        return res.status(403).json({ error: 'This transaction was refunded — no license can be issued.' });
+      }
       res.setHeader('Content-Disposition', 'attachment; filename="nexus-pro-license.txt"');
       return res.type('text/plain').send(hit.license + '\n');
     }
@@ -235,19 +257,8 @@ router.get('/redeem', redeemLimiter, async (req, res) => {
       return res.status(403).json({ error: 'Email does not match this transaction.' });
     }
 
-    // 4) Refunds/chargebacks revoke the license. `transaction_id` is a plain
-    // query parameter on GET /adjustments (not filter[transaction_id]); any
-    // API failure here fails closed — no refund check, no license.
-    const ar = await paddleFetch(`/adjustments?transaction_id=${encodeURIComponent(txnId)}&per_page=200`);
-    if (!ar.ok) throw new PaddleBusy(`Paddle adjustments ${ar.status}`);
-    const adjList = (await ar.json()).data || [];
-    const refundPending = adjList.some(
-      x =>
-        (x.action === 'refund' || x.action === 'chargeback') &&
-        (x.status === 'pending_approval' || x.status === 'approved'),
-    );
-    if (refundPending) {
-      refunded.add(txnId);
+    // 4) Refunds/chargebacks revoke the license (live, fail-closed).
+    if (await refundPending(txnId)) {
       return res.status(403).json({ error: 'This transaction was refunded — no license can be issued.' });
     }
 
