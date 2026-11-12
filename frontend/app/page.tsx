@@ -13,7 +13,7 @@ import { getTurnstileToken } from "@/lib/turnstile";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
-const BASE = STATIC_EXPORT ? "/dnstools" : "";
+const BASE = STATIC_EXPORT ? (process.env.NEXT_PUBLIC_BASE_PATH ?? "/dnstools") : "";
 
 function multiTargets(input: string): string[] {
   return input
@@ -1452,7 +1452,7 @@ function SpeedTestView({ data }: { data: any }) {
       const d = await res.json();
       if (d.shareUrl) {
         const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
-        const BASE = STATIC_EXPORT ? "/dnstools" : "";
+        const BASE = STATIC_EXPORT ? (process.env.NEXT_PUBLIC_BASE_PATH ?? "/dnstools") : "";
         let path = d.shareUrl as string;
         if (STATIC_EXPORT && path.startsWith("/speedtest/")) {
           const sid = path.slice("/speedtest/".length).replace(/\/$/, "");

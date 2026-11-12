@@ -9,7 +9,7 @@ import {
 } from "@/lib/verdicts";
 
 const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
-const BASE = STATIC_EXPORT ? "/dnstools" : "";
+const BASE = STATIC_EXPORT ? (process.env.NEXT_PUBLIC_BASE_PATH ?? "/dnstools") : "";
 
 const LEVEL_COLOR: Record<string, string> = {
   ok: "#10b981",

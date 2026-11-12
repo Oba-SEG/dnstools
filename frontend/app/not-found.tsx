@@ -7,10 +7,11 @@ import { useEffect } from "react";
 // served from 404.html — so the not-found page rewrites pretty URLs into
 // their shell+query form. Docker/nginx builds serve the pretty paths
 // directly (200) and never reach this page, so the rewrite is harmless.
+const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "/dnstools";
+
 export default function NotFound() {
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const base = "/dnstools";
     let p = window.location.pathname;
     if (p.startsWith(base)) p = p.slice(base.length) || "/";
     let m = /^\/d\/([^/]+)/.exec(p);
@@ -30,7 +31,7 @@ export default function NotFound() {
         <p className="text-[10px] uppercase tracking-[0.2em] text-orange-400/80 font-bold mb-3">404</p>
         <h1 className="font-display text-2xl font-bold tracking-tighter mb-3">Page not found</h1>
         <p className="text-[13px] text-muted-foreground mb-6">That URL doesn&apos;t exist on this site.</p>
-        <a href="/dnstools/" className="btn-primary px-5 py-2.5 rounded-xl text-sm inline-block">Back to the tools</a>
+        <a href={`${base}/`} className="btn-primary px-5 py-2.5 rounded-xl text-sm inline-block">Back to the tools</a>
       </div>
     </main>
   );

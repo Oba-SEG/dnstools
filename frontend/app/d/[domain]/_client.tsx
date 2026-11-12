@@ -17,7 +17,7 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
-const BASE = STATIC_EXPORT ? "/dnstools" : "";
+const BASE = STATIC_EXPORT ? (process.env.NEXT_PUBLIC_BASE_PATH ?? "/dnstools") : "";
 
 type CardKey = "whois" | "dns" | "dnssec" | "email" | "tls" | "headers" | "blacklist";
 
