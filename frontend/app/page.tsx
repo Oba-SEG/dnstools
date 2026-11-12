@@ -10,6 +10,7 @@ import { WorldMap } from "@/components/world-map";
 import { RecentsStrip, ToolVerdict } from "@/components/verdict";
 import { CommandPalette } from "@/components/command-palette";
 import { getTurnstileToken } from "@/lib/turnstile";
+import { fetchResilient } from "@/lib/api";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4001/api";
 const STATIC_EXPORT = process.env.NEXT_PUBLIC_STATIC_EXPORT === "1";
@@ -67,10 +68,15 @@ function parseDeepLink(): { tool: TabKey; domain: string; explicitTool: boolean 
 
 export default function Home() {
   const runSeq = useRef(0);
-  const [deepLink] = useState(() => parseDeepLink());
-  const [tab, setTab] = useState<TabKey>(() => deepLink?.tool ?? "lookup");
-  const [domain, setDomain] = useState(() => deepLink?.domain ?? "");
-  const [submitted, setSubmitted] = useState<string | null>(() => deepLink?.domain ?? null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Deep links are resolved after mount, never inside a useState initializer:
+  // reading window.location there makes the first client render differ from
+  // the prerendered HTML (SSR sees no query) and can break hydration on some
+  // mobile browsers — leaving the input dead and the Run button stuck grey.
+  const [deepLink, setDeepLink] = useState<ReturnType<typeof parseDeepLink>>(null);
+  const [tab, setTab] = useState<TabKey>("lookup");
+  const [domain, setDomain] = useState("");
+  const [submitted, setSubmitted] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +94,7 @@ export default function Home() {
     setData(null);
     try {
       if (which === "mha") {
-        const res = await fetch(`${API}/mha`, {
+        const res = await fetchResilient(`${API}/mha`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ headers: mhaInput }),
@@ -113,7 +119,7 @@ export default function Home() {
           throw new Error("Compare needs exactly two domains, comma-separated: example.com, other.com");
         }
         const headers = await mintHeavyHeader();
-        const res = await fetch(`${API}/compare?${new URLSearchParams({ domain1: list[0], domain2: list[1] })}`, { headers });
+        const res = await fetchResilient(`${API}/compare?${new URLSearchParams({ domain1: list[0], domain2: list[1] })}`, { headers });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || `HTTP ${res.status}`);
@@ -130,7 +136,7 @@ export default function Home() {
           throw new Error(`Batch supports up to 10 domains (got ${list.length}). Split the list and run twice.`);
         }
         const headers = await mintHeavyHeader();
-        const res = await fetch(`${API}/batch?${new URLSearchParams({ domains: list.join(","), mode: batchMode })}`, { headers });
+        const res = await fetchResilient(`${API}/batch?${new URLSearchParams({ domains: list.join(","), mode: batchMode })}`, { headers });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(body.error || `HTTP ${res.status}`);
@@ -163,13 +169,18 @@ export default function Home() {
           );
         }
       }
-      const res = await fetch(`${API}/${which}?${params.toString()}`, { headers });
+      const res = await fetchResilient(
+        `${API}/${which}?${params.toString()}`,
+        { headers },
+        (msg) => { if (!stale()) setError(msg); },
+      );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       const body = await res.json();
-      if (!stale()) setData(body);
+      // Clear any transient retry note ("Waking the API…") left by onNote.
+      if (!stale()) { setData(body); setError(null); }
     } catch (e: any) {
       if (!stale()) setError(e?.message || "Request failed");
     } finally {
@@ -190,10 +201,34 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, propType, batchMode]);
 
+  // Resolve deep links after hydration so the first client render matches SSR.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const dl = parseDeepLink();
+      if (!dl) return;
+      setDeepLink(dl);
+      setDomain(dl.domain);
+      if (!dl.explicitTool && dl.tool === "lookup") {
+        window.location.assign(`${BASE}/d/${encodeURIComponent(dl.domain)}`);
+        return;
+      }
+      setTab(dl.tool);
+      setSubmitted(dl.domain);
+      // When the tool is already "lookup" the request effect doesn't re-run
+      // (tab unchanged), so kick the first lookup off directly.
+      if (dl.tool === "lookup") run("lookup", dl.domain);
+    }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleaned = domain.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
-    if (!cleaned) return;
+    if (!cleaned) {
+      inputRef.current?.focus();
+      return;
+    }
     if (!toolPicked && tab === "lookup") {
       window.location.assign(`${BASE}/d/${encodeURIComponent(cleaned)}`);
       return;
@@ -249,6 +284,7 @@ export default function Home() {
             <Search className="absolute left-4.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none ml-1" />
             <input
               type="text"
+              ref={inputRef}
               autoFocus
               spellCheck={false}
               autoComplete="off"
@@ -259,7 +295,7 @@ export default function Home() {
             />
             <button
               type="submit"
-              disabled={!domain.trim() || loading}
+              disabled={loading}
               className="btn-primary h-11 px-5 rounded-xl flex items-center gap-2 text-xs font-bold"
             >
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
