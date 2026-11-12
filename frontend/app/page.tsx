@@ -213,8 +213,12 @@ export default function Home() {
       }
       setTab(dl.tool);
       setSubmitted(dl.domain);
+      // When the tool is already "lookup" the request effect doesn't re-run
+      // (tab unchanged), so kick the first lookup off directly.
+      if (dl.tool === "lookup") run("lookup", dl.domain);
     }, 0);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onSubmit = (e: React.FormEvent) => {
