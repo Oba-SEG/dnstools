@@ -66,16 +66,32 @@ export default function DomainOverviewClient({ pathDomain }: { pathDomain?: stri
   const params = useParams();
   const routeDomain = params?.domain as string | undefined;
 
-  const [domain] = useState<string | null>(() => {
+  // Resolve the domain from the path when the server gave us one (Docker/nginx
+  // builds). For the static-export shell (/d/_/) the real domain lives in the
+  // query string — that read must happen after hydration, not inside a
+  // useState initializer, or the first client render won't match the
+  // prerendered HTML and handlers can fail to attach on mobile browsers.
+  const [domain, setDomain] = useState<string | null>(() => {
     if (pathDomain && pathDomain !== "_" && pathDomain !== "index") return cleanDomain(pathDomain);
-    if (typeof window === "undefined") return null;
-    const fromQuery = new URLSearchParams(window.location.search).get("domain");
-    if (fromQuery) {
-      const cleaned = cleanDomain(fromQuery);
-      return isDomainish(cleaned) ? cleaned : null;
-    }
-    return routeDomain && routeDomain !== "_" ? cleanDomain(routeDomain) : null;
+    return null;
   });
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (domain) return;
+      const fromQuery = new URLSearchParams(window.location.search).get("domain");
+      if (fromQuery) {
+        const cleaned = cleanDomain(fromQuery);
+        if (isDomainish(cleaned)) {
+          setDomain(cleaned);
+          return;
+        }
+      }
+      if (routeDomain && routeDomain !== "_") setDomain(cleanDomain(routeDomain));
+    }, 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [cards, setCards] = useState<Record<CardKey, CardState>>(INITIAL);
 

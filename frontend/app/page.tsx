@@ -67,10 +67,15 @@ function parseDeepLink(): { tool: TabKey; domain: string; explicitTool: boolean 
 
 export default function Home() {
   const runSeq = useRef(0);
-  const [deepLink] = useState(() => parseDeepLink());
-  const [tab, setTab] = useState<TabKey>(() => deepLink?.tool ?? "lookup");
-  const [domain, setDomain] = useState(() => deepLink?.domain ?? "");
-  const [submitted, setSubmitted] = useState<string | null>(() => deepLink?.domain ?? null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Deep links are resolved after mount, never inside a useState initializer:
+  // reading window.location there makes the first client render differ from
+  // the prerendered HTML (SSR sees no query) and can break hydration on some
+  // mobile browsers — leaving the input dead and the Run button stuck grey.
+  const [deepLink, setDeepLink] = useState<ReturnType<typeof parseDeepLink>>(null);
+  const [tab, setTab] = useState<TabKey>("lookup");
+  const [domain, setDomain] = useState("");
+  const [submitted, setSubmitted] = useState<string | null>(null);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -190,10 +195,30 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, propType, batchMode]);
 
+  // Resolve deep links after hydration so the first client render matches SSR.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const dl = parseDeepLink();
+      if (!dl) return;
+      setDeepLink(dl);
+      setDomain(dl.domain);
+      if (!dl.explicitTool && dl.tool === "lookup") {
+        window.location.assign(`${BASE}/d/${encodeURIComponent(dl.domain)}`);
+        return;
+      }
+      setTab(dl.tool);
+      setSubmitted(dl.domain);
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleaned = domain.trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
-    if (!cleaned) return;
+    if (!cleaned) {
+      inputRef.current?.focus();
+      return;
+    }
     if (!toolPicked && tab === "lookup") {
       window.location.assign(`${BASE}/d/${encodeURIComponent(cleaned)}`);
       return;
@@ -249,6 +274,7 @@ export default function Home() {
             <Search className="absolute left-4.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none ml-1" />
             <input
               type="text"
+              ref={inputRef}
               autoFocus
               spellCheck={false}
               autoComplete="off"
@@ -259,7 +285,7 @@ export default function Home() {
             />
             <button
               type="submit"
-              disabled={!domain.trim() || loading}
+              disabled={loading}
               className="btn-primary h-11 px-5 rounded-xl flex items-center gap-2 text-xs font-bold"
             >
               {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
